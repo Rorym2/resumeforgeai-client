@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { TouchableOpacity, Text } from 'react-native';
+import { View, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
 
 import { supabase } from '../lib/supabase';
 
@@ -35,8 +35,14 @@ export default function AppNavigator() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Still checking for an existing session — show nothing briefly
-  if (session === undefined) return null;
+  // Still checking for an existing session — show a centered spinner
+  if (session === undefined) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>

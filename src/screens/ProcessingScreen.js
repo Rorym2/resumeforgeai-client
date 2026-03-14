@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { colors, spacing, font } from '../theme';
 import { generate } from '../lib/api';
@@ -51,6 +51,9 @@ export default function ProcessingScreen({ navigation, route }) {
         <Text style={styles.errorIcon}>⚠️</Text>
         <Text style={styles.errorTitle}>Generation Failed</Text>
         <Text style={styles.errorMessage}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.retryText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -98,5 +101,18 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
+    marginBottom: spacing.xl,
+  },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  retryText: {
+    fontSize: font.md,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
 });

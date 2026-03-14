@@ -138,6 +138,78 @@ Lists past generations fetched from `GET /documents`.
 
 ---
 
+## Phase 7 — Google OAuth + Job URL Scraping (Complete)
+
+### Google OAuth Login
+
+**New dependencies:**
+- `expo-web-browser` — opens the Google sign-in page in an in-app browser
+- `expo-linking` — generates the correct redirect URL for Expo Go vs production builds
+
+**Updated: `app.json`**
+- Added `"scheme": "resumeforgeai"` — required for deep link redirect back to app after OAuth
+- Added `expo-web-browser` to plugins array
+
+**Updated: `src/screens/AuthScreen.js`**
+- Added "Continue with Google" button above the email/password form
+- Uses `supabase.auth.signInWithOAuth({ provider: 'google' })` to get the auth URL
+- Opens the URL in an in-app browser via `WebBrowser.openAuthSessionAsync()`
+- Android fix: `createTask: false` option keeps auth in the same app task so the redirect works
+- After browser closes, extracts `access_token` + `refresh_token` from the redirect URL and calls `supabase.auth.setSession()`
+- Falls back to `getSession()` check if token extraction fails (handles cases where Supabase sets the session via deep link)
+
+**Supabase configuration required:**
+- Authentication → Providers → Google: enabled with Client ID + Secret
+- Authentication → URL Configuration → Redirect URLs: `exp://**` and `resumeforgeai://**`
+- Authentication → URL Configuration → Site URL: `resumeforgeai://`
+
+**Google Cloud Console configuration:**
+- Project: ResumeForge AI
+- OAuth 2.0 Client ID (Web application type)
+- Authorized redirect URI: `https://vvzimnitymgpyobkxuud.supabase.co/auth/v1/callback`
+- Test users: add emails that need to test during development
+
+**Known limitation:** Google OAuth redirect does not work reliably in Expo Go on Android due to how Expo Go handles the `exp://` deep link scheme. Email/password login works perfectly in Expo Go. Google OAuth will work fully in the production EAS build (Phase 9).
+
+### Job URL Scraping
+
+**New dependency:** `react-native-webview` — renders a full browser inside the app for LinkedIn
+
+**New: `src/lib/api.js` — `scrapeJobUrl(url, token)`**
+- Calls `POST /scrape/job-url` on the backend
+- On success: returns `{ text, source }`
+- On `LINKEDIN_LOGIN_REQUIRED` (HTTP 422): throws `err.code = 'LINKEDIN_LOGIN_REQUIRED'`
+- On other failure: throws with the backend error message
+
+**Updated: `src/screens/JobInputScreen.js`**
+- New URL input field at top of screen with "Fetch" button
+- On fetch success: auto-fills the job description text area
+- On LINKEDIN_LOGIN_REQUIRED: opens a full-screen Modal WebView pointed at the LinkedIn URL
+- LinkedIn WebView injects JavaScript (`LINKEDIN_EXTRACT_SCRIPT`) that searches for the job description container and calls `window.ReactNativeWebView.postMessage()` with the extracted text
+- On WebView message received: closes the modal and fills the text area
+- On any fetch failure: shows inline error message, paste area remains available as fallback
+- "Cancel" button closes the LinkedIn WebView modal
+
+**Backend — New: `src/services/jobScraper.js`**
+Site-specific scrapers using `cheerio` (HTML parser):
+- **Indeed** — selectors: `#jobDescriptionText`, `[data-testid="jobsearch-jobDescriptionText"]`
+- **ZipRecruiter** — selectors: `[data-testid="job-description"]`, `.jobDescriptionSection`
+- **LinkedIn** — best-effort on public pages; throws `LINKEDIN_LOGIN_REQUIRED` if description not found or too short
+- **Generic fallback** — tries common `[class*="job-description"]`, `article`, `main` selectors on any URL
+- All scrapers use browser-like `User-Agent` headers to avoid immediate blocking
+- Extracted text is cleaned (whitespace normalized) before returning
+
+**Backend — Updated: `src/routes/scrape.js`**
+- Existing `POST /scrape/job` (text paste) unchanged
+- New `POST /scrape/job-url`:
+  - Validates URL with `new URL(url)`
+  - Calls `scrapeJobUrl(url)` from jobScraper service
+  - Returns `{ success, text, source }` on success
+  - Returns HTTP 422 + `{ code: 'LINKEDIN_LOGIN_REQUIRED' }` for LinkedIn login walls
+  - Returns HTTP 422 + `{ error, fallback: true }` for other scraping failures
+
+---
+
 ## Phase 6 — Payments / Paywall (Complete)
 
 ### New: `src/lib/purchases.js`
@@ -249,13 +321,13 @@ All colors, spacing, font sizes, and border radii are centralized here. **These 
 | `phase/4-mobile-screens` | complete | All 4 core screens + navigation + theme + API lib |
 | `phase/5-auth` | complete | Supabase auth, AuthScreen, HistoryScreen, session management |
 | `phase/6-payments` | complete | RevenueCat wrapper (mock), PaywallScreen, 402 handling in api.js |
+| `phase/7-job-scraping` | complete | Google OAuth, job URL scraper, LinkedIn WebView |
 
 ---
 
 ## What's Left
 
-- **Phase 7**: Job URL scraping — paste a URL, backend scrapes the listing
-- **Phase 8**: Polish & QA
+- **Phase 8**: Polish & QA — In progress
 - **Phase 9**: EAS Build + swap in real RevenueCat SDK + App Store / Play Store submission
 - **Phase 10**: Go public
 
@@ -269,3 +341,6 @@ All colors, spacing, font sizes, and border radii are centralized here. **These 
 4. **Backend URL is `localhost`** — works for simulator/device on the same Wi-Fi with the backend running locally. Needs a deployed URL for any real testing off the developer's machine.
 5. **Results screen `fontFamily: 'monospace'`** — this renders differently on iOS vs Android. Consider switching to a proper monospace font via `expo-font` if the designer flags it.
 6. **Windows long path issue** — `node_modules` on Windows with paths >260 chars will fail to delete normally. Use `npx rimraf node_modules` to clean. Working project is kept at `C:\rfai\client` for this reason.
+7. **Google OAuth works in production builds only** — Expo Go on Android cannot handle the `exp://` deep link redirect reliably. Email/password login is the recommended auth method during development.
+8. **LinkedIn server-side scraping fails ~80% of the time** (login wall). The LinkedIn WebView approach works when the user is logged into LinkedIn in the app browser.
+9. **Job scraper CSS selectors may break** if Indeed/ZipRecruiter update their page structure — monitor after launch.

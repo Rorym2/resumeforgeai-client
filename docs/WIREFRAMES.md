@@ -148,7 +148,7 @@ These wireframes cover every screen in the app — both built and planned. They 
 ---
 
 ## Screen 3 — Job Input
-**Status:** BUILT (Phase 4)
+**Status:** ✅ BUILT (Phase 4, updated Phase 7)
 **Route:** `JobInput`
 
 ```
@@ -191,6 +191,11 @@ These wireframes cover every screen in the app — both built and planned. They 
 │  │  https://linkedin.com/... │  │  ← URL input field
 │  └───────────────────────────┘  │
 ```
+
+**Phase 7 additions:**
+- URL import field added at top (paste a link → auto-fills the text area)
+- LinkedIn opens an in-app browser (WebView) for login and auto-extraction
+- Fallback paste area always available if URL fetch fails
 
 ---
 

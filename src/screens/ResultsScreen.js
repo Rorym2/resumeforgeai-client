@@ -1,54 +1,109 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, font, radius } from '../theme';
 
+// Build a date string from start_date / end_date fields (parser format)
+// or fall back to a combined 'dates' field (older format)
+function formatDates(item) {
+  if (item.dates) return item.dates;
+  const start = item.start_date || '';
+  const end = item.end_date || '';
+  if (start && end) return `${start} – ${end}`;
+  if (start) return start;
+  return '';
+}
+
+// Format the structured JSON resume into readable sections
 function formatResume(optimizedResume) {
   if (!optimizedResume) return 'No resume data.';
   if (typeof optimizedResume === 'string') return optimizedResume;
 
-  // Format structured JSON resume into readable text
   const r = optimizedResume;
-  const lines = [];
+  const sections = [];
 
+  // Contact info
   if (r.contact) {
-    lines.push(r.contact.name || '');
-    if (r.contact.email) lines.push(r.contact.email);
-    if (r.contact.phone) lines.push(r.contact.phone);
-    if (r.contact.location) lines.push(r.contact.location);
-    lines.push('');
+    const contact = [
+      r.contact.name,
+      r.contact.email,
+      r.contact.phone,
+      r.contact.location,
+    ].filter(Boolean).join('\n');
+    if (contact) sections.push({ type: 'contact', text: contact });
   }
 
+  // Summary
   if (r.summary) {
-    lines.push('SUMMARY');
-    lines.push(r.summary);
-    lines.push('');
+    sections.push({ type: 'heading', text: 'SUMMARY' });
+    sections.push({ type: 'body', text: r.summary });
   }
 
-  if (r.experience?.length) {
-    lines.push('EXPERIENCE');
-    r.experience.forEach(job => {
-      lines.push(`${job.title} — ${job.company}`);
-      if (job.dates) lines.push(job.dates);
-      if (job.bullets?.length) job.bullets.forEach(b => lines.push(`• ${b}`));
-      lines.push('');
+  // Experience
+  const experience = r.experience || r.work_experience || [];
+  if (experience.length) {
+    sections.push({ type: 'heading', text: 'EXPERIENCE' });
+    experience.forEach(job => {
+      const company = job.company || job.organization || '';
+      const title = job.title || job.role || '';
+      const dates = formatDates(job);
+      const header = [title, company].filter(Boolean).join(' — ');
+      if (header) sections.push({ type: 'jobTitle', text: header });
+      if (dates) sections.push({ type: 'dates', text: dates });
+      (job.bullets || job.responsibilities || []).forEach(b => {
+        sections.push({ type: 'bullet', text: `• ${b}` });
+      });
     });
   }
 
-  if (r.skills?.length) {
-    lines.push('SKILLS');
-    lines.push(r.skills.join(' · '));
-    lines.push('');
+  // Skills
+  const skills = r.skills;
+  if (skills) {
+    sections.push({ type: 'heading', text: 'SKILLS' });
+    if (Array.isArray(skills)) {
+      sections.push({ type: 'body', text: skills.join(' · ') });
+    } else if (typeof skills === 'object') {
+      const allSkills = [
+        ...(skills.technical || []),
+        ...(skills.languages || []),
+        ...(skills.other || []),
+      ];
+      if (allSkills.length) sections.push({ type: 'body', text: allSkills.join(' · ') });
+    }
   }
 
-  if (r.education?.length) {
-    lines.push('EDUCATION');
-    r.education.forEach(e => {
-      lines.push(`${e.degree} — ${e.institution}`);
-      if (e.dates) lines.push(e.dates);
+  // Education
+  const education = r.education || [];
+  if (education.length) {
+    sections.push({ type: 'heading', text: 'EDUCATION' });
+    education.forEach(e => {
+      const institution = e.institution || e.school || '';
+      const degree = e.degree || e.field || '';
+      const dates = formatDates(e) || e.graduation_date || '';
+      const header = [degree, institution].filter(Boolean).join(' — ');
+      if (header) sections.push({ type: 'jobTitle', text: header });
+      if (dates) sections.push({ type: 'dates', text: dates });
     });
   }
 
-  return lines.join('\n');
+  // Leadership / Activities
+  const leadership = r.leadership_activities || r.leadership || [];
+  if (leadership.length) {
+    sections.push({ type: 'heading', text: 'LEADERSHIP & ACTIVITIES' });
+    leadership.forEach(item => {
+      const org = item.organization || '';
+      const role = item.role || item.title || '';
+      const dates = formatDates(item);
+      const header = [role, org].filter(Boolean).join(' — ');
+      if (header) sections.push({ type: 'jobTitle', text: header });
+      if (dates) sections.push({ type: 'dates', text: dates });
+      (item.bullets || []).forEach(b => {
+        sections.push({ type: 'bullet', text: `• ${b}` });
+      });
+    });
+  }
+
+  return sections;
 }
 
 function formatCoverLetter(coverLetter) {
@@ -57,21 +112,66 @@ function formatCoverLetter(coverLetter) {
   return coverLetter.body || coverLetter.text || JSON.stringify(coverLetter, null, 2);
 }
 
+// Convert sections array to plain text for clipboard
+function sectionsToPlainText(sections) {
+  if (!Array.isArray(sections)) return sections;
+  return sections.map(s => s.text).join('\n');
+}
+
+function scoreColor(score) {
+  if (score >= 80) return colors.success;
+  if (score >= 60) return colors.warning;
+  return colors.error;
+}
+
 export default function ResultsScreen({ route }) {
   const { result } = route.params;
   const [activeTab, setActiveTab] = useState('resume');
+  const [copied, setCopied] = useState(false);
 
-  const resumeText = formatResume(result.optimized_resume);
+  const resumeSections = formatResume(result.optimized_resume);
   const coverLetterText = formatCoverLetter(result.cover_letter);
-
   const matchScore = result.match_score?.score ?? result.match_score?.overall ?? null;
+
+  async function handleCopy() {
+    const text = activeTab === 'resume'
+      ? sectionsToPlainText(resumeSections)
+      : coverLetterText;
+    await Clipboard.setStringAsync(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const renderResume = () => {
+    if (!Array.isArray(resumeSections)) {
+      return <Text style={styles.bodyText}>{resumeSections}</Text>;
+    }
+    return resumeSections.map((section, i) => {
+      switch (section.type) {
+        case 'contact':
+          return <Text key={i} style={styles.contactText}>{section.text}</Text>;
+        case 'heading':
+          return <Text key={i} style={styles.sectionHeading}>{section.text}</Text>;
+        case 'jobTitle':
+          return <Text key={i} style={styles.jobTitle}>{section.text}</Text>;
+        case 'dates':
+          return <Text key={i} style={styles.datesText}>{section.text}</Text>;
+        case 'bullet':
+          return <Text key={i} style={styles.bulletText}>{section.text}</Text>;
+        default:
+          return <Text key={i} style={styles.bodyText}>{section.text}</Text>;
+      }
+    });
+  };
 
   return (
     <View style={styles.container}>
       {/* Match score badge */}
-      {matchScore && (
-        <View style={styles.scoreBadge}>
-          <Text style={styles.scoreText}>Match Score: {matchScore}%</Text>
+      {matchScore !== null && (
+        <View style={[styles.scoreBadge, { backgroundColor: scoreColor(matchScore) + '20' }]}>
+          <Text style={[styles.scoreText, { color: scoreColor(matchScore) }]}>
+            Match Score: {matchScore}%
+          </Text>
         </View>
       )}
 
@@ -97,10 +197,18 @@ export default function ResultsScreen({ route }) {
 
       {/* Content */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
-        <Text style={styles.bodyText}>
-          {activeTab === 'resume' ? resumeText : coverLetterText}
-        </Text>
+        {activeTab === 'resume'
+          ? renderResume()
+          : <Text style={styles.bodyText}>{coverLetterText}</Text>
+        }
       </ScrollView>
+
+      {/* Copy button */}
+      <TouchableOpacity style={styles.copyButton} onPress={handleCopy}>
+        <Text style={styles.copyButtonText}>
+          {copied ? '✓ Copied!' : '📋 Copy to Clipboard'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -111,16 +219,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scoreBadge: {
-    backgroundColor: colors.primaryLight,
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     borderRadius: radius.full,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     alignSelf: 'flex-start',
   },
   scoreText: {
-    color: colors.primary,
     fontWeight: '700',
     fontSize: font.sm,
   },
@@ -153,6 +259,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     margin: spacing.lg,
+    marginBottom: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -160,11 +267,62 @@ const styles = StyleSheet.create({
   },
   contentInner: {
     padding: spacing.md,
+    gap: 4,
+  },
+  // Resume section styles
+  contactText: {
+    fontSize: font.md,
+    color: colors.textPrimary,
+    lineHeight: 22,
+    marginBottom: spacing.sm,
+  },
+  sectionHeading: {
+    fontSize: font.sm,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 1,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: 2,
+  },
+  jobTitle: {
+    fontSize: font.md,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginTop: spacing.xs,
+  },
+  datesText: {
+    fontSize: font.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  bulletText: {
+    fontSize: font.sm,
+    color: colors.textPrimary,
+    lineHeight: 20,
+    paddingLeft: spacing.sm,
   },
   bodyText: {
     fontSize: font.sm,
     color: colors.textPrimary,
     lineHeight: 22,
-    fontFamily: 'monospace',
+  },
+  // Copy button
+  copyButton: {
+    margin: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  copyButtonText: {
+    fontSize: font.md,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });
