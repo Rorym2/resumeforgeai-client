@@ -34,7 +34,12 @@ export default function ProcessingScreen({ navigation, route }) {
         const result = await generate(resumeText, jobText, resumeId, session.access_token);
         navigation.replace('Results', { result });
       } catch (err) {
-        setError(err.message || 'Something went wrong. Please try again.');
+        if (err.code === 'FREE_TIER_LIMIT') {
+          // User has hit their 3 free generations — send them to the paywall
+          navigation.replace('Paywall');
+        } else {
+          setError(err.message || 'Something went wrong. Please try again.');
+        }
       }
     }
     run();

@@ -57,6 +57,11 @@ export async function generate(resumeText, jobText, resumeId, token) {
   });
 
   const data = await res.json();
+  if (res.status === 402) {
+    const err = new Error(data.error || 'Free tier limit reached.');
+    err.code = 'FREE_TIER_LIMIT';
+    throw err;
+  }
   if (!res.ok) throw new Error(data.error || 'Generation failed.');
   return data;
 }

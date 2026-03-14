@@ -11,6 +11,7 @@ import JobInputScreen from '../screens/JobInputScreen';
 import ProcessingScreen from '../screens/ProcessingScreen';
 import ResultsScreen from '../screens/ResultsScreen';
 import HistoryScreen from '../screens/HistoryScreen';
+import PaywallScreen from '../screens/PaywallScreen';
 
 import { colors, font, spacing } from '../theme';
 
@@ -81,6 +82,14 @@ export default function AppNavigator() {
               name="History"
               component={HistoryScreen}
               options={{ title: 'My Documents' }}
+            />
+            <Stack.Screen
+              name="Paywall"
+              component={PaywallScreen}
+              options={{
+                title: 'Go Pro',
+                presentation: 'modal',
+              }}
             />
           </>
         ) : (
