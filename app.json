@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "ResumeForge AI",
+    "slug": "resumeforgeai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mitchellstrategicsolutions.resumeforgeai"
+    },
+    "android": {
+      "package": "com.mitchellstrategicsolutions.resumeforgeai",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    }
+  }
+}
