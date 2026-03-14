@@ -2,9 +2,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { colors, spacing, font } from '../theme';
 import { generate } from '../lib/api';
-
-// Temporary hardcoded token for testing — replaced with real auth later
-const DEV_TOKEN = null;
+import { supabase } from '../lib/supabase';
 
 const STEPS = [
   'Parsing your resume...',
@@ -32,7 +30,8 @@ export default function ProcessingScreen({ navigation, route }) {
   useEffect(() => {
     async function run() {
       try {
-        const result = await generate(resumeText, jobText, resumeId, DEV_TOKEN);
+        const { data: { session } } = await supabase.auth.getSession();
+        const result = await generate(resumeText, jobText, resumeId, session.access_token);
         navigation.replace('Results', { result });
       } catch (err) {
         setError(err.message || 'Something went wrong. Please try again.');

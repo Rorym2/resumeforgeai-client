@@ -3,13 +3,16 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useState } from 'react';
 import { colors, spacing, font, radius } from '../theme';
 import { uploadResume } from '../lib/api';
-
-// Temporary hardcoded token for testing — will be replaced with real auth in a later step
-const DEV_TOKEN = null;
+import { supabase } from '../lib/supabase';
 
 export default function HomeScreen({ navigation }) {
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    // AppNavigator detects session is gone and shows Auth screen automatically
+  }
 
   async function handlePickFile() {
     try {
@@ -26,8 +29,9 @@ export default function HomeScreen({ navigation }) {
       const file = result.assets[0];
       setUploading(true);
 
-      // Upload to backend and get extracted text back
-      const data = await uploadResume(file.uri, file.name, file.mimeType, DEV_TOKEN);
+      // Get the current user's auth token and upload
+      const { data: { session } } = await supabase.auth.getSession();
+      const data = await uploadResume(file.uri, file.name, file.mimeType, session.access_token);
 
       setUploadedFile({
         name: file.name,
@@ -88,6 +92,11 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.buttonText}>Next: Add Job Description →</Text>
         </TouchableOpacity>
       )}
+
+      {/* Sign out — at the bottom */}
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -161,5 +170,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: font.md,
     fontWeight: '600',
+  },
+  signOutButton: {
+    marginTop: spacing.xl,
+    alignItems: 'center',
+  },
+  signOutText: {
+    fontSize: font.sm,
+    color: colors.textMuted,
   },
 });
