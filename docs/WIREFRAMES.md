@@ -41,7 +41,7 @@ These wireframes cover every screen in the app — both built and planned. They 
 ---
 
 ## Screen 1 — Login / Sign Up
-**Status:** NOT YET BUILT (Phase 5)
+**Status:** ✅ BUILT (Phase 5)
 **Route:** Shown automatically when no active session
 
 ```
@@ -282,7 +282,7 @@ These wireframes cover every screen in the app — both built and planned. They 
 ---
 
 ## Screen 6 — Paywall / Subscription
-**Status:** NOT YET BUILT (Phase 6)
+**Status:** ✅ BUILT (Phase 6)
 **Route:** `Paywall` — shown when free tier limit (3/month) is reached
 
 ```
@@ -325,7 +325,7 @@ These wireframes cover every screen in the app — both built and planned. They 
 ---
 
 ## Screen 7 — Document History
-**Status:** NOT YET BUILT (Phase 8)
+**Status:** ✅ BUILT (Phase 5)
 **Route:** `History` — accessible from nav or after Results screen
 
 ```
@@ -395,13 +395,13 @@ These wireframes cover every screen in the app — both built and planned. They 
 | Screen | Route | Status | Phase |
 |---|---|---|---|
 | Onboarding | — | Not built | 9 |
-| Login / Sign Up | `Login` | Not built | 5 |
+| Login / Sign Up | `Auth` | ✅ Built | 5 |
 | Home (Upload) | `Home` | ✅ Built | 4 |
 | Job Input | `JobInput` | ✅ Built | 4 |
 | Processing | `Processing` | ✅ Built | 4 |
 | Results | `Results` | ✅ Built | 4 |
-| Paywall | `Paywall` | Not built | 6 |
-| Document History | `History` | Not built | 8 |
+| History | `History` | ✅ Built | 5 |
+| Paywall | `Paywall` | ✅ Built | 6 |
 
 ---
 

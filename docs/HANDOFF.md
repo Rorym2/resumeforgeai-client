@@ -1,5 +1,5 @@
 # ResumeForge AI — Client Handoff Notes
-_Last updated: 2026-03-13_
+_Last updated: 2026-03-14_
 
 ## Overview
 
@@ -14,6 +14,7 @@ React Native mobile app (Expo) for ResumeForge AI. Users upload a resume, paste 
 | Framework | React Native 0.81.5 + Expo SDK 54 |
 | Navigation | React Navigation v6 (native stack) |
 | Auth | Supabase client-side auth (`@supabase/supabase-js`) |
+| Payments | RevenueCat (`react-native-purchases`) — currently mocked for Expo Go |
 | Backend comms | Native `fetch` API |
 | File picking | `expo-document-picker` |
 | Target | iOS + Android via Expo Go (dev) / EAS Build (production) |
@@ -45,14 +46,19 @@ resumeforgeai-client/
     ├── theme/
     │   └── index.js          # Design tokens: colors, spacing, font sizes, radius
     ├── lib/
-    │   └── api.js            # All backend API calls (uploadResume, generate, etc.)
+    │   ├── api.js            # All backend API calls (uploadResume, generate, etc.)
+    │   ├── supabase.js       # Supabase client with expo-secure-store token adapter
+    │   └── purchases.js      # RevenueCat wrapper (currently mocked for Expo Go)
     ├── navigation/
-    │   └── AppNavigator.js   # React Navigation stack navigator
+    │   └── AppNavigator.js   # React Navigation stack navigator + auth state listener
     └── screens/
+        ├── AuthScreen.js         # Sign In / Create Account tab toggle
         ├── HomeScreen.js         # Resume upload screen
         ├── JobInputScreen.js     # Job description paste screen
         ├── ProcessingScreen.js   # Animated loading screen (calls AI pipeline)
-        └── ResultsScreen.js      # Tabbed results (Resume / Cover Letter)
+        ├── ResultsScreen.js      # Tabbed results (Resume / Cover Letter)
+        ├── HistoryScreen.js      # Past generations list
+        └── PaywallScreen.js      # Subscription upsell screen
 ```
 
 ---
@@ -61,23 +67,20 @@ resumeforgeai-client/
 
 ```
 EXPO_PUBLIC_API_URL=http://localhost:3000
-```
-
-In production this will point to the deployed Railway/Render URL. Expo requires the `EXPO_PUBLIC_` prefix for env vars to be available in the app bundle.
-
-**Still needed (not yet added):**
-```
 EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+EXPO_PUBLIC_REVENUECAT_KEY=test_EEQViKauYoDbntGKTjQWMPpQWKg
 ```
+
+In production `EXPO_PUBLIC_API_URL` will point to the deployed Railway/Render URL. Expo requires the `EXPO_PUBLIC_` prefix for env vars to be available in the app bundle.
 
 ---
 
 ## Screen Flow
 
 ```
-[Login] (not built yet)
-    ↓ on sign in
+[AuthScreen] — Sign In / Create Account tabs
+    ↓ on successful login (AppNavigator detects session change)
 [HomeScreen] — user picks a PDF/DOCX resume file
     ↓ after upload succeeds
 [JobInputScreen] — user pastes the job description (min 100 chars)
@@ -85,26 +88,103 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 [ProcessingScreen] — animated steps, calls POST /generate
     ↓ on success
 [ResultsScreen] — tabbed view: Resume tab | Cover Letter tab + match score badge
+    ↓ via History button in Home header
+[HistoryScreen] — list of past generations, tap to re-open Results
+    ↓ if free tier limit hit (HTTP 402)
+[PaywallScreen] — modal, subscription options via RevenueCat
 ```
 
 ---
 
-## Authentication Status
+## Phase 5 — Supabase Auth (Complete)
 
-**Auth is NOT yet wired into the mobile app.** The screens currently have:
+### New: `src/lib/supabase.js`
+Supabase client configured for mobile using `expo-secure-store` as the token storage adapter. Keeps the user logged in between app restarts.
 
-```javascript
-const DEV_TOKEN = null; // placeholder
-```
+Key config:
+- `autoRefreshToken: true`
+- `persistSession: true`
+- `detectSessionInUrl: false`
 
-This means the upload and generate buttons will fail with a 401 error from the backend (which requires a valid JWT).
+### New: `src/screens/AuthScreen.js`
+Single screen with a Sign In / Create Account tab toggle.
 
-**Next step (Phase 5):** Add Supabase auth to the app:
-1. Install `expo-secure-store` (required by Supabase for token persistence on mobile)
-2. Create `src/lib/supabase.js` — Supabase client initialized with project URL + anon key
-3. Build `LoginScreen.js` — email + password form using `supabase.auth.signInWithPassword()`
-4. Add auth state listener in `AppNavigator.js` — show Login if no session, Home if signed in
-5. Replace `DEV_TOKEN = null` with `session.access_token` from `supabase.auth.getSession()`
+- Sign in: `supabase.auth.signInWithPassword()`
+- Sign up: `supabase.auth.signUp()` — sends a confirmation email
+- On successful login, `AppNavigator` detects the session change automatically and switches to the Home screen — no manual navigation needed
+
+### New: `src/screens/HistoryScreen.js`
+Lists past generations fetched from `GET /documents`.
+
+- Uses `useFocusEffect` to reload the list on every visit
+- Tapping an item navigates to the Results screen with the saved data pre-loaded
+- Three states: empty state, error state with retry button, and populated list
+- Color-coded match score badges: green (80+), amber (60–79), red (<60)
+
+### Updated: `src/navigation/AppNavigator.js`
+- Listens to `supabase.auth.onAuthStateChange`
+- Shows AuthScreen when no session, main app stack when signed in
+- Added History button in the Home screen header
+- Added Paywall as a modal screen in the navigator
+
+### Updated: `src/screens/HomeScreen.js`
+- Removed `DEV_TOKEN = null` placeholder
+- Now retrieves the real session token via `supabase.auth.getSession()`
+- Added Sign Out button at the bottom of the screen
+
+### Updated: `src/screens/ProcessingScreen.js`
+- Same token fix as HomeScreen
+- Now catches `err.code === 'FREE_TIER_LIMIT'` and navigates to Paywall instead of showing a generic error message
+
+---
+
+## Phase 6 — Payments / Paywall (Complete)
+
+### New: `src/lib/purchases.js`
+RevenueCat wrapper — **currently a mock** because `react-native-purchases` is a native module incompatible with Expo Go.
+
+Exports:
+- `getSubscriptionStatus()` — returns mock free-tier status
+- `purchaseSubscription(packageId)` — simulates a successful purchase
+- `restorePurchases()` — simulates a restore
+- `PACKAGES` — array with pricing data for UI (Pro Monthly $9.99, Pro Annual $59.99)
+
+**To activate the real SDK in Phase 9:**
+1. `npx expo install react-native-purchases`
+2. Replace the mock functions in `src/lib/purchases.js` with real `Purchases` SDK calls
+3. Configure products in App Store Connect and Google Play Console
+4. API key is already in `EXPO_PUBLIC_REVENUECAT_KEY`
+
+### New: `src/screens/PaywallScreen.js`
+Full paywall UI:
+- Rocket icon header, feature list
+- Two pricing cards: Pro Monthly ($9.99) and Pro Annual ($59.99, with "BEST VALUE" badge)
+- CTA purchase button
+- Restore Purchase link (required by App Store / Play Store guidelines)
+- Maybe Later dismissal link
+- Legal text footer
+
+In Expo Go, tapping the purchase button shows a "Test Mode" alert instead of triggering a real purchase.
+
+**Note:** Pricing is placeholder — update `PACKAGES` in `src/lib/purchases.js` before launch.
+
+### Updated: `src/lib/api.js`
+The `generate()` function now checks for HTTP 402 status and throws an error with `err.code = 'FREE_TIER_LIMIT'`. This lets `ProcessingScreen` distinguish a paywall condition from any other error.
+
+---
+
+## Screen Build Status
+
+| Screen | Route | Status | Phase |
+|---|---|---|---|
+| Onboarding | — | Not built | 9 |
+| Login / Sign Up | Auth | ✅ Built | 5 |
+| Home (Upload) | Home | ✅ Built | 4 |
+| Job Input | JobInput | ✅ Built | 4 |
+| Processing | Processing | ✅ Built | 4 |
+| Results | Results | ✅ Built | 4 |
+| History | History | ✅ Built | 5 |
+| Paywall | Paywall | ✅ Built | 6 |
 
 ---
 
@@ -166,25 +246,26 @@ All colors, spacing, font sizes, and border radii are centralized here. **These 
 | `phase/1-ai-engine` | complete | (mirrors backend phase) |
 | `phase/2-backend-api` | complete | (mirrors backend phase) |
 | `phase/3-database-auth` | complete | (mirrors backend phase) |
-| `phase/4-mobile-screens` | in progress | All 4 screens + navigation + theme + API lib |
+| `phase/4-mobile-screens` | complete | All 4 core screens + navigation + theme + API lib |
+| `phase/5-auth` | complete | Supabase auth, AuthScreen, HistoryScreen, session management |
+| `phase/6-payments` | complete | RevenueCat wrapper (mock), PaywallScreen, 402 handling in api.js |
 
 ---
 
 ## What's Left
 
-- **Phase 5**: Supabase auth in the app (Login screen, session management)
-- **Phase 6**: RevenueCat paywall + subscription screen
-- **Phase 7**: Job URL input (paste a URL, backend scrapes the listing)
-- **Phase 8**: Document history screen (view past generations)
-- **Phase 9**: Polish — onboarding flow, empty states, error handling
-- **Phase 10**: EAS Build for App Store / Play Store submission
+- **Phase 7**: Job URL scraping — paste a URL, backend scrapes the listing
+- **Phase 8**: Polish & QA
+- **Phase 9**: EAS Build + swap in real RevenueCat SDK + App Store / Play Store submission
+- **Phase 10**: Go public
 
 ---
 
 ## Known Issues / Notes for Advisor
 
-1. **Auth is missing** — the app cannot complete an upload or generation until Phase 5 is done. Everything before the API call works (navigation, file picker, job input form).
-2. **Backend URL is `localhost`** — works for simulator/device on same Wi-Fi with the backend running locally. Needs a deployed URL for any real testing off the developer's machine.
-3. **No token refresh logic** — Supabase tokens expire after 1 hour. When auth is added, ensure `supabase.auth.onAuthStateChange` is used to auto-refresh.
-4. **Results screen `fontFamily: 'monospace'`** — this renders differently on iOS vs Android. Consider switching to a proper monospace font via `expo-font` if the designer flags it.
-5. **Windows long path issue** — `node_modules` on Windows with paths >260 chars will fail to delete normally. Use `npx rimraf node_modules` to clean. Working project is kept at `C:\rfai\client` for this reason.
+1. **RevenueCat payments are mocked** — real purchases require an EAS production build (Phase 9). To activate: `npx expo install react-native-purchases`, replace mock functions in `src/lib/purchases.js`, configure products in App Store Connect and Google Play Console.
+2. **Pricing is placeholder** ($9.99/mo, $59.99/yr) — update `PACKAGES` in `src/lib/purchases.js` before launch.
+3. **Job titles show "— undefined" in Results** when the resume PDF doesn't include employment dates in a parseable format — AI prompt fix planned for Phase 8.
+4. **Backend URL is `localhost`** — works for simulator/device on the same Wi-Fi with the backend running locally. Needs a deployed URL for any real testing off the developer's machine.
+5. **Results screen `fontFamily: 'monospace'`** — this renders differently on iOS vs Android. Consider switching to a proper monospace font via `expo-font` if the designer flags it.
+6. **Windows long path issue** — `node_modules` on Windows with paths >260 chars will fail to delete normally. Use `npx rimraf node_modules` to clean. Working project is kept at `C:\rfai\client` for this reason.
