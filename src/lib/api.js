@@ -31,7 +31,7 @@ export async function uploadResume(fileUri, fileName, mimeType, token) {
   return data;
 }
 
-// Submit a job description (text only for now — URL scraping comes in Phase 7)
+// Submit a job description as plain text
 export async function submitJob(jobText, token) {
   const res = await fetch(`${API_URL}/scrape/job`, {
     method: 'POST',
@@ -41,6 +41,26 @@ export async function submitJob(jobText, token) {
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Job submission failed.');
+  return data;
+}
+
+// Scrape a job description from a URL (Indeed, ZipRecruiter, generic)
+// Returns { text, source } on success
+// Throws with err.code === 'LINKEDIN_LOGIN_REQUIRED' for LinkedIn pages
+export async function scrapeJobUrl(url, token) {
+  const res = await fetch(`${API_URL}/scrape/job-url`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ url }),
+  });
+
+  const data = await res.json();
+  if (res.status === 422 && data.code === 'LINKEDIN_LOGIN_REQUIRED') {
+    const err = new Error(data.error);
+    err.code = 'LINKEDIN_LOGIN_REQUIRED';
+    throw err;
+  }
+  if (!res.ok) throw new Error(data.error || 'Could not fetch job from URL.');
   return data;
 }
 
