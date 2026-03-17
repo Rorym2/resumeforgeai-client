@@ -1,5 +1,5 @@
 # ResumeForge AI — Client Handoff Notes
-_Last updated: 2026-03-14_
+_Last updated: 2026-03-17_
 
 ## Overview
 
@@ -66,13 +66,13 @@ resumeforgeai-client/
 ## Environment Variables (`.env`)
 
 ```
-EXPO_PUBLIC_API_URL=http://localhost:3000
+EXPO_PUBLIC_API_URL=https://resumeforgeai-backend-production.up.railway.app
 EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 EXPO_PUBLIC_REVENUECAT_KEY=test_EEQViKauYoDbntGKTjQWMPpQWKg
 ```
 
-In production `EXPO_PUBLIC_API_URL` will point to the deployed Railway/Render URL. Expo requires the `EXPO_PUBLIC_` prefix for env vars to be available in the app bundle.
+`EXPO_PUBLIC_API_URL` now points to the live Railway deployment. Expo requires the `EXPO_PUBLIC_` prefix for env vars to be available in the app bundle.
 
 ---
 
@@ -135,6 +135,26 @@ Lists past generations fetched from `GET /documents`.
 ### Updated: `src/screens/ProcessingScreen.js`
 - Same token fix as HomeScreen
 - Now catches `err.code === 'FREE_TIER_LIMIT'` and navigates to Paywall instead of showing a generic error message
+
+---
+
+## Phase 8 — Polish & QA (Complete)
+
+**Updated: `src/screens/ResultsScreen.js`**
+- Added `sanitize()` helper that strips the literal strings `"undefined"` and `"null"` returned by the AI when date fields are missing in PDFs
+- Applied to `formatDates()` and the `graduation_date` fallback in the education section
+- Fixes "undefined" appearing in place of employment/graduation dates in the Results screen
+
+**Updated: `package.json`**
+- Synced with working directory (`C:\rfai\client`) — added missing packages: `expo-clipboard`, `expo-linking`, `expo-secure-store`, `expo-web-browser`, `react-native-webview`
+
+**New: `eas.json`**
+- EAS Build config with `development`, `preview`, and `production` profiles
+- All profiles inject `EXPO_PUBLIC_API_URL` pointing to the live Railway backend
+- `preview` profile outputs an APK for Android sideload testing
+
+**Updated: `.env`**
+- `EXPO_PUBLIC_API_URL` updated from `localhost:3000` to the live Railway URL
 
 ---
 
@@ -322,13 +342,36 @@ All colors, spacing, font sizes, and border radii are centralized here. **These 
 | `phase/5-auth` | complete | Supabase auth, AuthScreen, HistoryScreen, session management |
 | `phase/6-payments` | complete | RevenueCat wrapper (mock), PaywallScreen, 402 handling in api.js |
 | `phase/7-job-scraping` | complete | Google OAuth, job URL scraper, LinkedIn WebView |
+| `phase/8-polish` | complete | Undefined date fix, EAS setup, package.json synced, Android APK build |
+
+---
+
+## EAS Build Setup (Phase 9)
+
+EAS CLI is installed (`eas-cli@18.4.0`). Project is linked to Expo account `olithesavage` (project ID: `77971d73-7706-47d0-83bf-13af0d64046a`).
+
+`eas.json` has three profiles:
+- `development` — internal distribution with dev client
+- `preview` — internal APK (Android sideload) / IPA for TestFlight
+- `production` — auto-increments build number, for App Store / Play Store
+
+**To build Android APK for testing:**
+```bash
+eas build --profile preview --platform android
+```
+
+**To build iOS (requires Apple Developer Program enrollment):**
+```bash
+eas build --profile preview --platform ios
+```
+
+**Apple Developer Program:** Not yet enrolled. Enroll at https://developer.apple.com/enroll/ ($99/year). Required before any iOS build can be submitted or distributed via TestFlight.
 
 ---
 
 ## What's Left
 
-- **Phase 8**: Polish & QA — In progress
-- **Phase 9**: EAS Build + swap in real RevenueCat SDK + App Store / Play Store submission
+- **Phase 9**: Activate real RevenueCat SDK, complete Android APK test, enroll Apple Developer + iOS TestFlight build, App Store / Play Store submission
 - **Phase 10**: Go public
 
 ---
@@ -337,10 +380,8 @@ All colors, spacing, font sizes, and border radii are centralized here. **These 
 
 1. **RevenueCat payments are mocked** — real purchases require an EAS production build (Phase 9). To activate: `npx expo install react-native-purchases`, replace mock functions in `src/lib/purchases.js`, configure products in App Store Connect and Google Play Console.
 2. **Pricing is placeholder** ($9.99/mo, $59.99/yr) — update `PACKAGES` in `src/lib/purchases.js` before launch.
-3. **Job titles show "— undefined" in Results** when the resume PDF doesn't include employment dates in a parseable format — AI prompt fix planned for Phase 8.
-4. **Backend URL is `localhost`** — works for simulator/device on the same Wi-Fi with the backend running locally. Needs a deployed URL for any real testing off the developer's machine.
-5. **Results screen `fontFamily: 'monospace'`** — this renders differently on iOS vs Android. Consider switching to a proper monospace font via `expo-font` if the designer flags it.
-6. **Windows long path issue** — `node_modules` on Windows with paths >260 chars will fail to delete normally. Use `npx rimraf node_modules` to clean. Working project is kept at `C:\rfai\client` for this reason.
-7. **Google OAuth works in production builds only** — Expo Go on Android cannot handle the `exp://` deep link redirect reliably. Email/password login is the recommended auth method during development.
-8. **LinkedIn server-side scraping fails ~80% of the time** (login wall). The LinkedIn WebView approach works when the user is logged into LinkedIn in the app browser.
-9. **Job scraper CSS selectors may break** if Indeed/ZipRecruiter update their page structure — monitor after launch.
+3. **Results screen `fontFamily: 'monospace'`** — renders differently on iOS vs Android. Consider switching to a proper monospace font via `expo-font` if the designer flags it.
+4. **Windows long path issue** — `node_modules` on Windows with paths >260 chars will fail to delete normally. Use `npx rimraf node_modules` to clean. Working project is kept at `C:\rfai\client` for this reason.
+5. **Google OAuth works in production builds only** — Expo Go on Android cannot handle the `exp://` deep link redirect reliably. Email/password login is the recommended auth method during development.
+6. **LinkedIn server-side scraping fails ~80% of the time** (login wall). The LinkedIn WebView approach works when the user is logged into LinkedIn in the app browser.
+7. **Job scraper CSS selectors may break** if Indeed/ZipRecruiter update their page structure — monitor after launch.
