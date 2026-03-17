@@ -3,12 +3,17 @@ import { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, font, radius } from '../theme';
 
+// Guard against AI returning the literal string "undefined" or "null" for missing fields
+function sanitize(val) {
+  return (val && val !== 'undefined' && val !== 'null') ? val : '';
+}
+
 // Build a date string from start_date / end_date fields (parser format)
 // or fall back to a combined 'dates' field (older format)
 function formatDates(item) {
-  if (item.dates) return item.dates;
-  const start = item.start_date || '';
-  const end = item.end_date || '';
+  if (sanitize(item.dates)) return item.dates;
+  const start = sanitize(item.start_date);
+  const end = sanitize(item.end_date);
   if (start && end) return `${start} – ${end}`;
   if (start) return start;
   return '';
@@ -79,7 +84,7 @@ function formatResume(optimizedResume) {
     education.forEach(e => {
       const institution = e.institution || e.school || '';
       const degree = e.degree || e.field || '';
-      const dates = formatDates(e) || e.graduation_date || '';
+      const dates = formatDates(e) || sanitize(e.graduation_date);
       const header = [degree, institution].filter(Boolean).join(' — ');
       if (header) sections.push({ type: 'jobTitle', text: header });
       if (dates) sections.push({ type: 'dates', text: dates });
