@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { initPurchases, identifyUser, resetUser } from '../lib/purchases';
 
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -22,14 +23,23 @@ export default function AppNavigator() {
 
   // Listen for login/logout events from Supabase
   useEffect(() => {
+    // Initialize RevenueCat once on app start
+    initPurchases();
+
     // Get existing session on app start
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user?.id) identifyUser(session.user.id);
     });
 
     // Subscribe to future auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user?.id) {
+        identifyUser(session.user.id);
+      } else {
+        resetUser();
+      }
     });
 
     return () => subscription.unsubscribe();

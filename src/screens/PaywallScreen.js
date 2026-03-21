@@ -18,20 +18,13 @@ export default function PaywallScreen({ navigation }) {
   async function handlePurchase() {
     setLoading(true);
     try {
-      const result = await purchaseSubscription(selectedId);
-      if (result.mock) {
-        // In Expo Go — let the user know this is a test environment
-        Alert.alert(
-          'Test Mode',
-          'Payments are not active yet — this is a development build. Your subscription will be enabled when the app is published.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
-      } else {
-        Alert.alert('Success!', 'You\'re now a Pro member. Enjoy unlimited generations!', [
-          { text: 'Let\'s Go', onPress: () => navigation.goBack() },
-        ]);
-      }
+      await purchaseSubscription(selectedId);
+      Alert.alert('Success!', 'You\'re now a Pro member. Enjoy unlimited generations!', [
+        { text: 'Let\'s Go', onPress: () => navigation.goBack() },
+      ]);
     } catch (err) {
+      // User cancelling the purchase sheet throws an error — don't show an alert for that
+      if (err.userCancelled) return;
       Alert.alert('Purchase Failed', err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
