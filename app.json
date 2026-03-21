@@ -15,12 +15,14 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mitchellstrategicsolutions.resumeforgeai",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.mitchellstrategicsolutions.resumeforgeai",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       }
