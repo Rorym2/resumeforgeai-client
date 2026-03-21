@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.mitchellstrategicsolutions.resumeforgeai"
+      "bundleIdentifier": "com.mitchellstrategicsolutions.resumeforgeai",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.mitchellstrategicsolutions.resumeforgeai",
@@ -25,6 +28,12 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "77971d73-7706-47d0-83bf-13af0d64046a"
+      }
+    },
+    "owner": "olithesavage"
   }
 }
