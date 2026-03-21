@@ -1,5 +1,5 @@
 # ResumeForge AI — Client Handoff Notes
-_Last updated: 2026-03-17_
+_Last updated: 2026-03-21_
 
 ## Overview
 
@@ -343,6 +343,52 @@ All colors, spacing, font sizes, and border radii are centralized here. **These 
 | `phase/6-payments` | complete | RevenueCat wrapper (mock), PaywallScreen, 402 handling in api.js |
 | `phase/7-job-scraping` | complete | Google OAuth, job URL scraper, LinkedIn WebView |
 | `phase/8-polish` | complete | Undefined date fix, EAS setup, package.json synced, Android APK build |
+| `phase/9-beta-launch` | in progress | RevenueCat wiring, app.json v1.0.0 prep — EAS builds pending |
+
+---
+
+## Phase 9 — Beta Launch (In Progress)
+
+### What's Done
+
+**Updated: `src/lib/purchases.js`**
+- Added `initPurchases()`, `identifyUser(userId)`, and `resetUser()` exports
+- Still a mock implementation — `react-native-purchases` (native SDK) is NOT installed
+- The mock is intentional: the real SDK is a native module that crashes Expo Go and Metro bundler
+- **To activate the real SDK before EAS production build:**
+  1. `npx expo install react-native-purchases`
+  2. Swap the mock functions with real `Purchases` SDK calls (see comment structure in the file)
+  3. Real SDK uses `IS_EXPO_GO` check to fall back to mock in dev if needed
+
+**Updated: `src/navigation/AppNavigator.js`**
+- Calls `initPurchases()` once on app start
+- Calls `identifyUser(session.user.id)` when a user logs in (links RevenueCat to Supabase user)
+- Calls `resetUser()` on logout
+
+**Updated: `app.json`**
+- Added `ios.buildNumber: "1"` — required by App Store for every submission
+- Added `android.versionCode: 1` — required by Google Play for every submission
+- Synced from git repo to working dir: EAS `projectId`, `owner`, `ITSAppUsesNonExemptEncryption: false`
+
+### What's Remaining
+
+| Step | Status | Notes |
+|---|---|---|
+| Apple Developer Program enrollment | pending | Enrolled, awaiting approval — $99/yr at developer.apple.com |
+| App Store Connect app record | not started | Create after Apple approval |
+| Google Play Console account | not started | $25 one-time at play.google.com/console |
+| Google Play app record | not started | Create after Play Console setup |
+| RevenueCat dashboard | not started | Create "pro" Entitlement + default Offering with Monthly + Annual packages |
+| EAS iOS build → TestFlight | not started | `eas build --profile preview --platform ios` then `eas submit` |
+| EAS Android build → Play internal | not started | `eas build --profile production --platform android` then `eas submit` |
+| In-app feedback link | not started | Add Google Form / Typeform link button to HomeScreen or HistoryScreen |
+| Beta user recruitment | not started | LinkedIn post + Reddit (r/resumes, r/jobs) — target 20–30 testers |
+| PostHog analytics | not started | Track: generation_started, generation_succeeded, generation_failed |
+
+### Pricing Confirmed
+- Pro Monthly: **$9.99/month**
+- Pro Annual: **$59.99/year**
+- These match `PACKAGES` in `src/lib/purchases.js` and need to match products created in App Store Connect + Play Console exactly
 
 ---
 
@@ -371,7 +417,7 @@ eas build --profile preview --platform ios
 
 ## What's Left
 
-- **Phase 9**: Activate real RevenueCat SDK, complete Android APK test, enroll Apple Developer + iOS TestFlight build, App Store / Play Store submission
+- **Phase 9**: See Phase 9 section below — account setup + EAS builds remaining
 - **Phase 10**: Go public
 
 ---
