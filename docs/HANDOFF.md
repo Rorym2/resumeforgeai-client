@@ -415,10 +415,63 @@ eas build --profile preview --platform ios
 
 ---
 
-## What's Left
+## Phase 10 — App Store Submission (In Progress)
+_Last session: 2026-04-25_
 
-- **Phase 9**: See Phase 9 section below — account setup + EAS builds remaining
-- **Phase 10**: Go public
+### What's Done
+
+**`src/lib/purchases.js`** (branch: `phase/10-app-store`)
+- Updated pricing to match confirmed business plan:
+  - Pro Monthly: `$9.99` → `$12.99`
+  - Pro Annual: `$59.99` → `$95.88` ($7.99/mo), savings updated from "50%" → "38%"
+- Period label updated to `per year · $7.99/mo` for clarity
+
+**Landing page** (`resumeforgeai-landing` repo — separate Next.js app)
+- Pricing fixed to match above
+- `/privacy` and `/terms` pages created (required for App Store + Play Store review)
+- Deployed to Vercel: `https://resumeforgeai-landing.vercel.app`
+- Waitlist table created in Supabase — email capture is live
+
+### What's Remaining
+
+| Step | Status | Notes |
+|---|---|---|
+| Swap real RevenueCat SDK | Not started | See instructions below |
+| RevenueCat Android config | In progress | Need service account JSON from Google Play Console |
+| RevenueCat iOS config | Not started | Blocked on Apple Developer enrollment |
+| Apple Developer enrollment | Not started | $99/yr at developer.apple.com |
+| Google Play Console onboarding | In progress | Filling in developer profile |
+| EAS Android production build | Not started | `eas build --profile production --platform android` |
+| EAS iOS build | Not started | Blocked on Apple enrollment |
+| Play Store submission | Not started | After EAS Android build |
+| App Store submission | Not started | Blocked on Apple enrollment |
+| Add store links to landing page | Not started | After apps are approved |
+| PostHog analytics | Not started | Track: generation_started, generation_succeeded, generation_failed |
+| In-app feedback link | Not started | Add to HomeScreen or HistoryScreen |
+| Product Hunt prep | Not started | Draft tagline, description, screenshots |
+| Beta recruitment | Not started | LinkedIn post + Reddit (r/resumes, r/jobs) |
+
+### How to Swap in the Real RevenueCat SDK
+
+When ready to do the EAS production build:
+1. `cd C:\rfai\client` (or git repo after npm install)
+2. `npx expo install react-native-purchases`
+3. Replace mock functions in `src/lib/purchases.js` with real `Purchases` SDK calls
+4. Update `EXPO_PUBLIC_REVENUECAT_KEY` in `.env` with the production Android key from RevenueCat dashboard
+5. Rebuild with `eas build --profile production --platform android`
+
+### RevenueCat Next Steps
+1. Finish Google Play Console onboarding
+2. Upload service account credentials JSON to RevenueCat (Apps & providers → Play Store app)
+3. Create Entitlement: ID `pro`, name `Pro`
+4. Create Products: `pro_monthly` ($12.99/mo), `pro_annual` ($95.88/yr)
+5. Create Default Offering and attach both packages
+
+---
+
+## What's Left (legacy note)
+
+- **Phase 10**: Go public — see Phase 10 section above
 
 ---
 
