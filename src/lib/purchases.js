@@ -37,7 +37,7 @@ export const PACKAGES = [
   {
     id: 'pro_monthly',
     label: 'Pro Monthly',
-    price: '$9.99',
+    price: '$12.99',
     period: 'per month',
     description: 'Unlimited tailored resumes & cover letters',
     highlighted: false,
@@ -45,9 +45,9 @@ export const PACKAGES = [
   {
     id: 'pro_annual',
     label: 'Pro Annual',
-    price: '$59.99',
-    period: 'per year',
-    description: 'Save 50% — best value',
+    price: '$95.88',
+    period: 'per year · $7.99/mo',
+    description: 'Save 38% vs monthly — best value',
     highlighted: true,
   },
 ];
