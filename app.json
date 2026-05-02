@@ -1,29 +1,42 @@
 {
   "expo": {
-    "name": "client",
-    "slug": "client",
+    "name": "ResumeForge AI",
+    "slug": "resumeforgeai",
+    "scheme": "resumeforgeai",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mitchellstrategicsolutions.resumeforgeai",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "android": {
+      "package": "com.mitchellstrategicsolutions.resumeforgeai",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "react-native-purchases"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "77971d73-7706-47d0-83bf-13af0d64046a"
+      }
+    },
+    "owner": "olithesavage"
   }
 }
