@@ -36,8 +36,16 @@ export async function getSubscriptionStatus() {
   }
 }
 
+// rcPackage must be a RevenueCat Package object from getOfferings(), not a string ID.
+// Returns { success, userCancelled?, error?, notSupported? } — never throws.
 export async function purchaseSubscription(rcPackage) {
-  if (Platform.OS !== 'android') return { success: false };
+  // notSupported signals the caller that this platform doesn't support purchases
+  // (as opposed to a genuine failure) so it can show the right UI.
+  if (Platform.OS !== 'android') return { success: false, notSupported: true };
+  if (!rcPackage) {
+    // Offerings haven't loaded yet — tell the caller so they can show a retry prompt.
+    return { success: false, error: 'Pricing unavailable — please try again in a moment.' };
+  }
   try {
     const { customerInfo } = await Purchases.purchasePackage(rcPackage);
     const isPro = typeof customerInfo.entitlements.active['pro'] !== 'undefined';
@@ -50,8 +58,9 @@ export async function purchaseSubscription(rcPackage) {
   }
 }
 
+// Returns { isPro, notSupported? } — never throws.
 export async function restorePurchases() {
-  if (Platform.OS !== 'android') return { isPro: false };
+  if (Platform.OS !== 'android') return { isPro: false, notSupported: true };
   try {
     const customerInfo = await Purchases.restorePurchases();
     const isPro = typeof customerInfo.entitlements.active['pro'] !== 'undefined';
@@ -73,7 +82,7 @@ export async function getOfferings() {
   }
 }
 
-// Static fallback prices (shown before offerings load)
+// Static fallback prices (shown while live offerings load or as a layout reference)
 export const PACKAGES = [
   {
     id: 'pro_monthly',

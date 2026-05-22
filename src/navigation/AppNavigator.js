@@ -18,21 +18,20 @@ import { colors, font, spacing } from '../theme';
 
 const Stack = createNativeStackNavigator();
 
+// Dark abyss header shared across all authenticated screens
+const HEADER_DARK = '#0F172A';
+
 export default function AppNavigator() {
-  const [session, setSession] = useState(undefined); // undefined = still loading
+  const [session, setSession] = useState(undefined);
 
-  // Listen for login/logout events from Supabase
   useEffect(() => {
-    // Initialize RevenueCat once on app start
-    initPurchases();
+    initPurchases().catch(e => console.error('[Purchases] init error:', e));
 
-    // Get existing session on app start
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user?.id) identifyUser(session.user.id);
     });
 
-    // Subscribe to future auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user?.id) {
@@ -45,11 +44,10 @@ export default function AppNavigator() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Still checking for an existing session — show a centered spinner
   if (session === undefined) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -58,14 +56,14 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.textPrimary,
-          headerTitleStyle: { fontWeight: '600' },
+          headerStyle: { backgroundColor: HEADER_DARK },
+          headerTintColor: '#F8FAFF',
+          headerTitleStyle: { fontWeight: '600', fontSize: font.md },
+          headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
         }}
       >
         {session ? (
-          // Logged in — show the main app screens
           <>
             <Stack.Screen
               name="Home"
@@ -73,48 +71,33 @@ export default function AppNavigator() {
               options={({ navigation }) => ({
                 title: 'ResumeForge AI',
                 headerRight: () => (
-                  <TouchableOpacity onPress={() => navigation.navigate('History')} style={{ marginRight: spacing.sm }}>
-                    <Text style={{ color: colors.primary, fontSize: font.md, fontWeight: '600' }}>History</Text>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('History')}
+                    style={{ marginRight: spacing.sm }}
+                  >
+                    <Text style={{ color: colors.accent, fontSize: font.sm, fontWeight: '600', letterSpacing: 0.3 }}>
+                      History
+                    </Text>
                   </TouchableOpacity>
                 ),
               })}
             />
-            <Stack.Screen
-              name="JobInput"
-              component={JobInputScreen}
-              options={{ title: 'Job Description' }}
-            />
+            <Stack.Screen name="JobInput" component={JobInputScreen} options={{ title: 'Job Description' }} />
             <Stack.Screen
               name="Processing"
               component={ProcessingScreen}
               options={{ title: 'Generating...', headerBackVisible: false }}
             />
-            <Stack.Screen
-              name="Results"
-              component={ResultsScreen}
-              options={{ title: 'Your Results' }}
-            />
-            <Stack.Screen
-              name="History"
-              component={HistoryScreen}
-              options={{ title: 'My Documents' }}
-            />
+            <Stack.Screen name="Results" component={ResultsScreen} options={{ title: 'Your Results' }} />
+            <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'My Documents' }} />
             <Stack.Screen
               name="Paywall"
               component={PaywallScreen}
-              options={{
-                title: 'Go Pro',
-                presentation: 'modal',
-              }}
+              options={{ title: 'Go Pro', presentation: 'modal' }}
             />
           </>
         ) : (
-          // Logged out — show the auth screen
-          <Stack.Screen
-            name="Auth"
-            component={AuthScreen}
-            options={{ headerShown: false }}
-          />
+          <Stack.Screen name="Auth" component={AuthScreen} options={{ headerShown: false }} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

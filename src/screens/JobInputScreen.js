@@ -19,8 +19,6 @@ import { colors, spacing, font, radius } from '../theme';
 
 const MIN_LENGTH = 100;
 
-// JavaScript injected into the LinkedIn WebView once the page loads.
-// It looks for the job description container and sends the text back to the app.
 const LINKEDIN_EXTRACT_SCRIPT = `
   (function() {
     function extract() {
@@ -44,10 +42,7 @@ const LINKEDIN_EXTRACT_SCRIPT = `
           return;
         }
       }
-      // Not found yet — will retry via interval
     }
-
-    // Try immediately and then every second for up to 10 seconds
     extract();
     let attempts = 0;
     const interval = setInterval(() => {
@@ -69,38 +64,33 @@ export default function JobInputScreen({ navigation, route }) {
   const [linkedInUrl, setLinkedInUrl] = useState('');
   const webViewRef = useRef(null);
 
-  const isReady = jobText.trim().length >= MIN_LENGTH;
+  const charCount = jobText.trim().length;
+  const isReady = charCount >= MIN_LENGTH;
 
   function handleGenerate() {
-    navigation.navigate('Processing', {
-      resumeId,
-      resumeText,
-      jobText: jobText.trim(),
-    });
+    navigation.navigate('Processing', { resumeId, resumeText, jobText: jobText.trim() });
   }
 
   async function handleFetchUrl() {
     const url = urlInput.trim();
     if (!url) return;
-
-    // Basic URL check
     if (!url.startsWith('http')) {
       setFetchError('Please enter a full URL starting with http:// or https://');
       return;
     }
-
     setFetching(true);
     setFetchError(null);
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert('Session Expired', 'Please sign in again.');
+        return;
+      }
       const result = await scrapeJobUrl(url, session.access_token);
       setJobText(result.text);
       setUrlInput('');
     } catch (err) {
       if (err.code === 'LINKEDIN_LOGIN_REQUIRED') {
-        // Open LinkedIn in the in-app browser so the user can log in
-        // and we can extract the job description via JavaScript injection
         setLinkedInUrl(url);
         setShowLinkedInWebView(true);
       } else {
@@ -111,7 +101,6 @@ export default function JobInputScreen({ navigation, route }) {
     }
   }
 
-  // Called when the LinkedIn WebView sends us the extracted job text
   function handleWebViewMessage(event) {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -121,53 +110,58 @@ export default function JobInputScreen({ navigation, route }) {
         setUrlInput('');
       }
     } catch {
-      // Ignore non-JSON messages
+      // ignore non-JSON
     }
   }
 
   return (
     <>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           style={styles.container}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* URL import section */}
-          <Text style={styles.label}>Import from a job listing URL</Text>
-          <Text style={styles.hint}>
-            Paste a link from Indeed, ZipRecruiter, or LinkedIn and we'll read it for you.
-          </Text>
-
-          <View style={styles.urlRow}>
-            <TextInput
-              style={styles.urlInput}
-              placeholder="https://www.indeed.com/viewjob?jk=..."
-              placeholderTextColor={colors.textMuted}
-              value={urlInput}
-              onChangeText={(v) => { setUrlInput(v); setFetchError(null); }}
-              autoCapitalize="none"
-              keyboardType="url"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[styles.fetchButton, (fetching || !urlInput.trim()) && styles.fetchButtonDisabled]}
-              onPress={handleFetchUrl}
-              disabled={fetching || !urlInput.trim()}
-            >
-              {fetching
-                ? <ActivityIndicator color="#FFFFFF" size="small" />
-                : <Text style={styles.fetchButtonText}>Fetch</Text>
-              }
-            </TouchableOpacity>
+          {/* Step indicator */}
+          <View style={styles.stepBar}>
+            <View style={styles.stepDone}><Text style={styles.stepDoneText}>✓</Text></View>
+            <View style={[styles.stepLine, { backgroundColor: colors.primary }]} />
+            <View style={styles.stepActive}><Text style={styles.stepActiveText}>2</Text></View>
+            <View style={styles.stepLine} />
+            <View style={styles.stepInactive}><Text style={styles.stepInactiveText}>3</Text></View>
           </View>
 
-          {fetchError && (
-            <Text style={styles.fetchError}>{fetchError}</Text>
-          )}
+          {/* URL import */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.accentDot} />
+              <Text style={styles.label}>Import from URL</Text>
+            </View>
+            <Text style={styles.hint}>Indeed, ZipRecruiter, or LinkedIn</Text>
+            <View style={styles.urlRow}>
+              <TextInput
+                style={styles.urlInput}
+                placeholder="https://..."
+                placeholderTextColor={colors.textMuted}
+                value={urlInput}
+                onChangeText={(v) => { setUrlInput(v); setFetchError(null); }}
+                autoCapitalize="none"
+                keyboardType="url"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={[styles.fetchButton, (fetching || !urlInput.trim()) && styles.fetchButtonDisabled]}
+                onPress={handleFetchUrl}
+                disabled={fetching || !urlInput.trim()}
+              >
+                {fetching
+                  ? <ActivityIndicator color="#FFFFFF" size="small" />
+                  : <Text style={styles.fetchButtonText}>Fetch</Text>
+                }
+              </TouchableOpacity>
+            </View>
+            {fetchError && <Text style={styles.fetchError}>{fetchError}</Text>}
+          </View>
 
           {/* Divider */}
           <View style={styles.divider}>
@@ -176,32 +170,40 @@ export default function JobInputScreen({ navigation, route }) {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Manual paste area */}
-          <Text style={styles.label}>Paste the job description</Text>
-          <Text style={styles.hint}>
-            Copy the full job posting and paste it below.
-          </Text>
-
-          <TextInput
-            style={styles.input}
-            multiline
-            placeholder="Paste job description here..."
-            placeholderTextColor={colors.textMuted}
-            value={jobText}
-            onChangeText={setJobText}
-            textAlignVertical="top"
-          />
-
-          <Text style={[styles.charCount, isReady && styles.charCountReady]}>
-            {!isReady
-              ? `${MIN_LENGTH - jobText.trim().length} more characters needed`
-              : `✓ Ready to generate`}
-          </Text>
+          {/* Manual paste */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.accentDot} />
+              <Text style={styles.label}>Paste job description</Text>
+            </View>
+            <Text style={styles.hint}>Copy the full job posting and paste it below</Text>
+            <TextInput
+              style={[styles.input, isReady && styles.inputReady]}
+              multiline
+              placeholder="Paste job description here..."
+              placeholderTextColor={colors.textMuted}
+              value={jobText}
+              onChangeText={setJobText}
+              textAlignVertical="top"
+            />
+            {/* Progress bar */}
+            <View style={styles.progressTrack}>
+              <View style={[
+                styles.progressFill,
+                { width: `${Math.min((charCount / MIN_LENGTH) * 100, 100)}%` },
+                isReady && styles.progressFillDone,
+              ]} />
+            </View>
+            <Text style={[styles.charCount, isReady && styles.charCountReady]}>
+              {isReady ? '✓ Ready to generate' : `${MIN_LENGTH - charCount} more characters needed`}
+            </Text>
+          </View>
 
           <TouchableOpacity
             style={[styles.button, !isReady && styles.buttonDisabled]}
             onPress={handleGenerate}
             disabled={!isReady}
+            activeOpacity={0.85}
           >
             <Text style={styles.buttonText}>Generate Optimized Resume</Text>
           </TouchableOpacity>
@@ -220,10 +222,7 @@ export default function JobInputScreen({ navigation, route }) {
             <Text style={styles.webViewSubtitle}>
               Log in and navigate to the job — we'll read it automatically.
             </Text>
-            <TouchableOpacity
-              style={styles.webViewClose}
-              onPress={() => setShowLinkedInWebView(false)}
-            >
+            <TouchableOpacity style={styles.webViewClose} onPress={() => setShowLinkedInWebView(false)}>
               <Text style={styles.webViewCloseText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -234,10 +233,6 @@ export default function JobInputScreen({ navigation, route }) {
             onMessage={handleWebViewMessage}
             javaScriptEnabled
             domStorageEnabled
-            onLoadEnd={() => {
-              // Re-inject the script after page load completes
-              webViewRef.current?.injectJavaScript(LINKEDIN_EXTRACT_SCRIPT);
-            }}
           />
         </View>
       </Modal>
@@ -254,11 +249,81 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
+  stepBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  stepDone: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDoneText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepActive: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepActiveText: {
+    color: '#FFFFFF',
+    fontSize: font.sm,
+    fontWeight: '700',
+  },
+  stepInactive: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepInactiveText: {
+    color: colors.textMuted,
+    fontSize: font.sm,
+    fontWeight: '600',
+  },
+  stepLine: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: colors.border,
+  },
+  sectionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  accentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
   label: {
-    fontSize: font.lg,
+    fontSize: font.md,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
   hint: {
     fontSize: font.sm,
@@ -269,20 +334,19 @@ const styles = StyleSheet.create({
   urlRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
   },
   urlInput: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.sm,
     fontSize: font.sm,
     color: colors.textPrimary,
   },
   fetchButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
@@ -294,18 +358,18 @@ const styles = StyleSheet.create({
   },
   fetchButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: font.sm,
   },
   fetchError: {
     fontSize: font.sm,
     color: colors.error,
-    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: spacing.md,
     gap: spacing.sm,
   },
   dividerLine: {
@@ -318,29 +382,48 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     fontSize: font.md,
     color: colors.textPrimary,
-    minHeight: 220,
+    minHeight: 200,
+    marginBottom: spacing.sm,
+  },
+  inputReady: {
+    borderColor: colors.primary,
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 3,
+    backgroundColor: colors.accent,
+    borderRadius: 2,
+  },
+  progressFillDone: {
+    backgroundColor: colors.primary,
   },
   charCount: {
     fontSize: font.sm,
     color: colors.textSecondary,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
   },
   charCountReady: {
-    color: colors.success,
+    color: colors.primary,
+    fontWeight: '600',
   },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.ember,
     borderRadius: radius.md,
     padding: spacing.md,
     alignItems: 'center',
+    marginTop: spacing.sm,
   },
   buttonDisabled: {
     backgroundColor: colors.border,
@@ -348,28 +431,29 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#FFFFFF',
     fontSize: font.md,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  // LinkedIn WebView modal
   webViewContainer: {
     flex: 1,
     backgroundColor: colors.background,
   },
   webViewHeader: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#0F172A',
     padding: spacing.md,
+    paddingTop: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   webViewTitle: {
     fontSize: font.lg,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: '#F8FAFF',
+    marginBottom: spacing.xs,
   },
   webViewSubtitle: {
     fontSize: font.sm,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    color: colors.accent,
     marginBottom: spacing.sm,
   },
   webViewClose: {

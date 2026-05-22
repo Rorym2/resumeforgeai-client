@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,12 +13,12 @@ import { getDocuments } from '../lib/api';
 import { colors, spacing, font, radius } from '../theme';
 
 function formatDate(isoString) {
-  const date = new Date(isoString);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(isoString).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
 }
 
 function getJobTitle(item) {
-  // Try to extract job title from parsed_job or fall back to a snippet of job_text
   return item.parsed_job?.title
     || item.parsed_job?.job_title
     || item.job_text?.split('\n')[0]?.slice(0, 50)
@@ -27,15 +26,11 @@ function getJobTitle(item) {
 }
 
 function getCompany(item) {
-  return item.parsed_job?.company
-    || item.parsed_job?.company_name
-    || '';
+  return item.parsed_job?.company || item.parsed_job?.company_name || '';
 }
 
 function getScore(item) {
-  return item.match_score?.score
-    || item.match_score?.overall
-    || null;
+  return item.match_score?.score || item.match_score?.overall || null;
 }
 
 function scoreColor(score) {
@@ -43,6 +38,30 @@ function scoreColor(score) {
   if (score >= 60) return colors.warning;
   return colors.error;
 }
+
+function ScorePill({ score }) {
+  const color = scoreColor(score);
+  return (
+    <View style={[pill.wrap, { borderColor: color, backgroundColor: color + '15' }]}>
+      <Text style={[pill.text, { color }]}>{score}%</Text>
+    </View>
+  );
+}
+
+const pill = StyleSheet.create({
+  wrap: {
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm,
+    minWidth: 48,
+    alignItems: 'center',
+  },
+  text: {
+    fontSize: font.sm,
+    fontWeight: '700',
+  },
+});
 
 export default function HistoryScreen({ navigation }) {
   const [documents, setDocuments] = useState([]);
@@ -63,17 +82,12 @@ export default function HistoryScreen({ navigation }) {
     }
   }
 
-  // Reload every time the user navigates to this screen
   useFocusEffect(useCallback(() => { loadDocuments(); }, []));
-
-  function handleOpen(item) {
-    navigation.navigate('Results', { result: item });
-  }
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -92,10 +106,12 @@ export default function HistoryScreen({ navigation }) {
   if (documents.length === 0) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.emptyIcon}>📂</Text>
+        <View style={styles.emptyIcon}>
+          <Text style={styles.emptyIconText}>↗</Text>
+        </View>
         <Text style={styles.emptyTitle}>No documents yet</Text>
         <Text style={styles.emptySubtitle}>
-          Upload your resume and generate your first tailored resume to see it here.
+          Generate your first tailored resume and it'll appear here.
         </Text>
       </View>
     );
@@ -109,20 +125,21 @@ export default function HistoryScreen({ navigation }) {
       contentContainerStyle={styles.listContent}
       renderItem={({ item }) => {
         const score = getScore(item);
+        const company = getCompany(item);
         return (
-          <TouchableOpacity style={styles.card} onPress={() => handleOpen(item)}>
-            <View style={styles.cardLeft}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.navigate('Results', { result: item })}
+            activeOpacity={0.75}
+          >
+            {/* Left accent bar */}
+            <View style={[styles.accentBar, score !== null && { backgroundColor: scoreColor(score) }]} />
+            <View style={styles.cardBody}>
               <Text style={styles.jobTitle} numberOfLines={1}>{getJobTitle(item)}</Text>
-              {getCompany(item) ? (
-                <Text style={styles.company} numberOfLines={1}>{getCompany(item)}</Text>
-              ) : null}
+              {company ? <Text style={styles.company} numberOfLines={1}>{company}</Text> : null}
               <Text style={styles.date}>{formatDate(item.created_at)}</Text>
             </View>
-            {score !== null && (
-              <View style={[styles.scoreBadge, { backgroundColor: scoreColor(score) + '20' }]}>
-                <Text style={[styles.scoreText, { color: scoreColor(score) }]}>{score}%</Text>
-              </View>
-            )}
+            {score !== null && <ScorePill score={score} />}
           </TouchableOpacity>
         );
       }}
@@ -144,57 +161,63 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
-  cardLeft: {
+  accentBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    backgroundColor: colors.border,
+  },
+  cardBody: {
     flex: 1,
-    marginRight: spacing.md,
+    padding: spacing.md,
+    paddingLeft: spacing.sm + 4,
+    marginRight: spacing.sm,
   },
   jobTitle: {
     fontSize: font.md,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   company: {
     fontSize: font.sm,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
   },
   date: {
     fontSize: font.sm,
     color: colors.textMuted,
   },
-  scoreBadge: {
-    borderRadius: radius.full,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    minWidth: 52,
-    alignItems: 'center',
-  },
-  scoreText: {
-    fontSize: font.sm,
-    fontWeight: '700',
-  },
   emptyIcon: {
-    fontSize: 48,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.md,
+  },
+  emptyIconText: {
+    fontSize: 24,
+    color: colors.primary,
+    fontWeight: '700',
   },
   emptyTitle: {
     fontSize: font.xl,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
+    letterSpacing: -0.3,
   },
   emptySubtitle: {
     fontSize: font.md,
@@ -216,7 +239,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: font.md,
   },
 });

@@ -7,33 +7,44 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { colors, spacing, font, radius } from '../theme';
-import { purchaseSubscription, restorePurchases, PACKAGES } from '../lib/purchases';
+import { purchaseSubscription, restorePurchases, getOfferings, PACKAGES } from '../lib/purchases';
 
 export default function PaywallScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState('pro_annual');
+  const [rcOffering, setRcOffering] = useState(null);
+
+  useEffect(() => {
+    getOfferings().then(offering => setRcOffering(offering));
+  }, []);
+
+  function getSelectedRcPackage() {
+    return rcOffering?.availablePackages?.find(p => p.identifier === selectedId) ?? null;
+  }
+
+  function getDisplayPrice() {
+    const rcPackage = getSelectedRcPackage();
+    if (rcPackage?.product?.priceString) return rcPackage.product.priceString;
+    return PACKAGES.find(p => p.id === selectedId)?.price ?? '';
+  }
 
   async function handlePurchase() {
     setLoading(true);
     try {
-      const result = await purchaseSubscription(selectedId);
-      if (result.mock) {
-        Alert.alert(
-          'Test Mode',
-          'Payments are not active in Expo Go. Purchases will work in the production build.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
-      } else {
-        Alert.alert('Success!', 'You\'re now a Pro member. Enjoy unlimited generations!', [
-          { text: 'Let\'s Go', onPress: () => navigation.goBack() },
+      const result = await purchaseSubscription(getSelectedRcPackage());
+      if (result.notSupported) {
+        Alert.alert('Not Available', 'Purchases are only supported on Android at this time.');
+      } else if (result.userCancelled) {
+        // user dismissed — do nothing
+      } else if (result.success) {
+        Alert.alert("You're now Pro!", 'Enjoy unlimited tailored resumes and cover letters.', [
+          { text: "Let's Go", onPress: () => navigation.goBack() },
         ]);
+      } else {
+        Alert.alert('Purchase Failed', result.error || 'Something went wrong. Please try again.');
       }
-    } catch (err) {
-      // User cancelling the purchase sheet throws an error — don't show an alert for that
-      if (err.userCancelled) return;
-      Alert.alert('Purchase Failed', err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -43,48 +54,54 @@ export default function PaywallScreen({ navigation }) {
     setLoading(true);
     try {
       const result = await restorePurchases();
-      if (result.isPro) {
+      if (result.notSupported) {
+        Alert.alert('Not Available', 'Purchases are only supported on Android at this time.');
+      } else if (result.isPro) {
         Alert.alert('Restored!', 'Your Pro subscription has been restored.', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else {
-        Alert.alert('No Subscription Found', 'We couldn\'t find an active subscription to restore.');
+        Alert.alert('No Subscription Found', "We couldn't find an active subscription to restore.");
       }
-    } catch (err) {
-      Alert.alert('Restore Failed', err.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }
   }
 
+  const FEATURES = [
+    'Unlimited resume optimizations',
+    'Unlimited cover letters',
+    'ATS match score for every job',
+    'Full document history',
+  ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.icon}>🚀</Text>
+      {/* Dark hero */}
+      <View style={styles.hero}>
+        <View style={styles.heroIcon}>
+          <Text style={styles.heroIconText}>↑</Text>
+        </View>
         <Text style={styles.title}>Upgrade to Pro</Text>
         <Text style={styles.subtitle}>
-          You've used your 3 free generations this month.{'\n'}
-          Upgrade for unlimited tailored resumes and cover letters.
+          You've used your 3 free generations.{'\n'}
+          Unlock unlimited access.
         </Text>
       </View>
 
-      {/* Feature list */}
+      {/* Features */}
       <View style={styles.features}>
-        {[
-          'Unlimited resume optimizations',
-          'Unlimited cover letters',
-          'ATS match score for every job',
-          'Save & access your full history',
-        ].map((feature) => (
+        {FEATURES.map((feature) => (
           <View key={feature} style={styles.featureRow}>
-            <Text style={styles.featureCheck}>✓</Text>
+            <View style={styles.checkCircle}>
+              <Text style={styles.checkMark}>✓</Text>
+            </View>
             <Text style={styles.featureText}>{feature}</Text>
           </View>
         ))}
       </View>
 
-      {/* Pricing options */}
+      {/* Packages */}
       <View style={styles.packages}>
         {PACKAGES.map((pkg) => (
           <TouchableOpacity
@@ -92,9 +109,9 @@ export default function PaywallScreen({ navigation }) {
             style={[
               styles.packageCard,
               selectedId === pkg.id && styles.packageCardSelected,
-              pkg.highlighted && styles.packageCardHighlighted,
             ]}
             onPress={() => setSelectedId(pkg.id)}
+            activeOpacity={0.8}
           >
             {pkg.highlighted && (
               <View style={styles.bestValueBadge}>
@@ -117,20 +134,21 @@ export default function PaywallScreen({ navigation }) {
         ))}
       </View>
 
-      {/* CTA button */}
+      {/* CTA */}
       <TouchableOpacity
         style={[styles.ctaButton, loading && styles.ctaButtonDisabled]}
         onPress={handlePurchase}
         disabled={loading}
+        activeOpacity={0.85}
       >
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.ctaText}>Start Pro — {PACKAGES.find(p => p.id === selectedId)?.price}</Text>
+          <Text style={styles.ctaText}>Start Pro — {getDisplayPrice()}</Text>
         )}
       </TouchableOpacity>
 
-      {/* Footer links */}
+      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity onPress={handleRestore} disabled={loading}>
           <Text style={styles.footerLink}>Restore Purchase</Text>
@@ -142,7 +160,7 @@ export default function PaywallScreen({ navigation }) {
       </View>
 
       <Text style={styles.legalText}>
-        Subscriptions renew automatically. Cancel anytime in your App Store or Google Play settings.
+        Subscriptions renew automatically. Cancel anytime in your Google Play settings.
       </Text>
     </ScrollView>
   );
@@ -154,33 +172,47 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  header: {
+  hero: {
+    backgroundColor: '#0F172A',
     alignItems: 'center',
-    marginBottom: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  icon: {
-    fontSize: 56,
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.ember,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.md,
+  },
+  heroIconText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '700',
   },
   title: {
     fontSize: font.xxl,
     fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    color: '#F8FAFF',
+    marginBottom: spacing.xs,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: font.md,
-    color: colors.textSecondary,
+    color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 22,
   },
   features: {
+    marginHorizontal: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
@@ -192,11 +224,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  featureCheck: {
-    fontSize: font.md,
-    color: colors.success,
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkMark: {
+    fontSize: 11,
     fontWeight: '700',
-    width: 20,
+    color: colors.accent,
   },
   featureText: {
     fontSize: font.md,
@@ -204,6 +243,7 @@ const styles = StyleSheet.create({
   },
   packages: {
     gap: spacing.md,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
   packageCard: {
@@ -215,28 +255,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    position: 'relative',
   },
   packageCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: '#EEF2FF',
-  },
-  packageCardHighlighted: {
-    position: 'relative',
+    backgroundColor: colors.primaryLight,
   },
   bestValueBadge: {
     position: 'absolute',
     top: -10,
     right: spacing.md,
-    backgroundColor: colors.success,
+    backgroundColor: colors.accent,
     borderRadius: radius.full,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
   bestValueText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   packageLeft: {
     flex: 1,
@@ -270,10 +308,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   ctaButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.ember,
     borderRadius: radius.md,
     padding: spacing.md,
     alignItems: 'center',
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
   ctaButtonDisabled: {
@@ -283,6 +322,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: font.md,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   footer: {
     flexDirection: 'row',
@@ -304,5 +344,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 16,
+    marginHorizontal: spacing.lg,
   },
 });

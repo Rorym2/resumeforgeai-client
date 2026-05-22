@@ -22,15 +22,14 @@
     },
     "android": {
       "package": "com.mitchellstrategicsolutions.resumeforgeai",
-      "versionCode": 1,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       }
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser",
-      "react-native-purchases"
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

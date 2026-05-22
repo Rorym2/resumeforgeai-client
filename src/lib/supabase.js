@@ -24,9 +24,15 @@ const ChunkedSecureStoreAdapter = {
 
   async setItem(key, value) {
     if (value.length <= CHUNK_SIZE) {
-      // Small enough — store as a single key, clean up any old chunks
+      // Shrinking to a single key — delete any old chunks so they don't linger
+      const oldChunkCount = await SecureStore.getItemAsync(`${key}__chunks`);
+      if (oldChunkCount) {
+        for (let i = 0; i < parseInt(oldChunkCount, 10); i++) {
+          await SecureStore.deleteItemAsync(`${key}__chunk_${i}`);
+        }
+        await SecureStore.deleteItemAsync(`${key}__chunks`);
+      }
       await SecureStore.setItemAsync(key, value);
-      await SecureStore.deleteItemAsync(`${key}__chunks`);
       return;
     }
 
@@ -35,6 +41,16 @@ const ChunkedSecureStoreAdapter = {
     for (let i = 0; i < value.length; i += CHUNK_SIZE) {
       chunks.push(value.slice(i, i + CHUNK_SIZE));
     }
+
+    // Delete any extra chunks left over from a previous, longer value
+    const oldChunkCount = await SecureStore.getItemAsync(`${key}__chunks`);
+    if (oldChunkCount) {
+      const oldCount = parseInt(oldChunkCount, 10);
+      for (let i = chunks.length; i < oldCount; i++) {
+        await SecureStore.deleteItemAsync(`${key}__chunk_${i}`);
+      }
+    }
+
     for (let i = 0; i < chunks.length; i++) {
       await SecureStore.setItemAsync(`${key}__chunk_${i}`, chunks[i]);
     }
