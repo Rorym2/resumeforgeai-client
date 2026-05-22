@@ -8,7 +8,9 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://resumeforgeai-backend-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://resumeforgeai-backend-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vvzimnitymgpyobkxuud.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_1Zg79mvN16w0K8RgkCOeGg_gb2GCRp9"
       }
     },
     "preview": {
@@ -17,13 +19,17 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://resumeforgeai-backend-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://resumeforgeai-backend-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vvzimnitymgpyobkxuud.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_1Zg79mvN16w0K8RgkCOeGg_gb2GCRp9"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://resumeforgeai-backend-production.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://resumeforgeai-backend-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://vvzimnitymgpyobkxuud.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_1Zg79mvN16w0K8RgkCOeGg_gb2GCRp9"
       }
     }
   },
