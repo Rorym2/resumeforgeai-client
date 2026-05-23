@@ -138,7 +138,7 @@ function BulletRow({ icon, iconColor, text }) {
   );
 }
 
-export default function ResultsScreen({ route }) {
+export default function ResultsScreen({ route, navigation }) {
   const { result } = route.params;
   const [activeTab, setActiveTab] = useState('score');
   const [copied, setCopied] = useState(false);
@@ -292,14 +292,22 @@ export default function ResultsScreen({ route }) {
         }
       </ScrollView>
 
-      {/* Copy button — only for resume/cover letter tabs */}
-      {activeTab !== 'score' && (
-        <TouchableOpacity style={styles.copyButton} onPress={handleCopy}>
-          <Text style={styles.copyButtonText}>
-            {copied ? '✓ Copied!' : '📋 Copy to Clipboard'}
-          </Text>
+      {/* Bottom actions */}
+      <View style={styles.bottomRow}>
+        {activeTab !== 'score' && (
+          <TouchableOpacity style={styles.copyButton} onPress={handleCopy}>
+            <Text style={styles.copyButtonText}>
+              {copied ? '✓ Copied!' : '📋 Copy'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.finishButton, activeTab === 'score' && styles.finishButtonFull]}
+          onPress={() => navigation.navigate('Done', { result })}
+        >
+          <Text style={styles.finishButtonText}>Finish & Export</Text>
         </TouchableOpacity>
-      )}
+      </View>
     </View>
   );
 }
@@ -483,10 +491,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 22,
   },
-  // Copy button
-  copyButton: {
+  bottomRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
     margin: spacing.lg,
     marginTop: spacing.sm,
+  },
+  copyButton: {
+    flex: 1,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -498,5 +510,20 @@ const styles = StyleSheet.create({
     fontSize: font.md,
     fontWeight: '600',
     color: colors.primary,
+  },
+  finishButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  finishButtonFull: {
+    flex: 1,
+  },
+  finishButtonText: {
+    fontSize: font.md,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -1,16 +1,16 @@
-import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
-import { colors, spacing, font } from '../theme';
+import { colors, spacing, font, radius } from '../theme';
 import { generate } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
 const STEPS = [
-  'Parsing your resume...',
-  'Analyzing the job listing...',
-  'Scoring your match...',
-  'Finding your strengths...',
-  'Rewriting for ATS...',
-  'Writing your cover letter...',
+  { label: 'Parsing resume',        tag: 'EXTRACT' },
+  { label: 'Analyzing job listing', tag: 'ANALYZE' },
+  { label: 'Scoring your match',    tag: 'SCORE'   },
+  { label: 'Finding strengths',     tag: 'MAP'     },
+  { label: 'Rewriting for ATS',     tag: 'FORGE'   },
+  { label: 'Writing cover letter',  tag: 'WRITE'   },
 ];
 
 export default function ProcessingScreen({ navigation, route }) {
@@ -18,7 +18,6 @@ export default function ProcessingScreen({ navigation, route }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState(null);
 
-  // Cycle through the step labels every 4 seconds so the user knows something is happening
   useEffect(() => {
     const interval = setInterval(() => {
       setStepIndex(i => (i + 1) % STEPS.length);
@@ -26,16 +25,19 @@ export default function ProcessingScreen({ navigation, route }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Kick off the AI pipeline as soon as this screen loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     async function run() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setError('Your session expired. Please sign in again.');
+          return;
+        }
         const result = await generate(resumeText, jobText, resumeId, session.access_token);
         navigation.replace('Results', { result });
       } catch (err) {
         if (err.code === 'FREE_TIER_LIMIT') {
-          // User has hit their 3 free generations — send them to the paywall
           navigation.replace('Paywall');
         } else {
           setError(err.message || 'Something went wrong. Please try again.');
@@ -48,7 +50,9 @@ export default function ProcessingScreen({ navigation, route }) {
   if (error) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorIcon}>⚠️</Text>
+        <View style={styles.errorIcon}>
+          <Text style={styles.errorIconText}>!</Text>
+        </View>
         <Text style={styles.errorTitle}>Generation Failed</Text>
         <Text style={styles.errorMessage}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
@@ -58,11 +62,34 @@ export default function ProcessingScreen({ navigation, route }) {
     );
   }
 
+  const step = STEPS[stepIndex];
+
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.stepLabel}>{STEPS[stepIndex]}</Text>
+      {/* Spinner ring */}
+      <View style={styles.spinnerWrap}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <View style={styles.spinnerInner}>
+          <Text style={styles.spinnerTag}>{step.tag}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.stepLabel}>{step.label}...</Text>
       <Text style={styles.hint}>This usually takes 20–30 seconds</Text>
+
+      {/* Step dots */}
+      <View style={styles.dots}>
+        {STEPS.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              i === stepIndex && styles.dotActive,
+              i < stepIndex && styles.dotDone,
+            ]}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -70,49 +97,95 @@ export default function ProcessingScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
   },
+  spinnerWrap: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
+  },
+  spinnerInner: {
+    position: 'absolute',
+  },
+  spinnerTag: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   stepLabel: {
-    fontSize: font.lg,
+    fontSize: font.xl,
     fontWeight: '600',
-    color: colors.textPrimary,
-    marginTop: spacing.lg,
+    color: '#F8FAFF',
     marginBottom: spacing.sm,
+    letterSpacing: -0.3,
   },
   hint: {
     fontSize: font.sm,
-    color: colors.textSecondary,
+    color: '#475569',
+    marginBottom: spacing.xl,
   },
+  dots: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#1E3A8A',
+  },
+  dotActive: {
+    backgroundColor: colors.accent,
+    width: 18,
+  },
+  dotDone: {
+    backgroundColor: colors.primary,
+  },
+  // Error state
   errorIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#7F1D1D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  errorIconText: {
+    color: '#FCA5A5',
+    fontSize: 24,
+    fontWeight: '700',
   },
   errorTitle: {
     fontSize: font.xl,
     fontWeight: '700',
-    color: colors.error,
+    color: '#F8FAFF',
     marginBottom: spacing.sm,
   },
   errorMessage: {
     fontSize: font.md,
-    color: colors.textSecondary,
+    color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: spacing.xl,
   },
   retryButton: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
+    borderColor: '#1D4ED8',
+    borderRadius: radius.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
   },
   retryText: {
     fontSize: font.md,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.accent,
   },
 });
+

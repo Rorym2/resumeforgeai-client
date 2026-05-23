@@ -86,6 +86,27 @@ export async function generate(resumeText, jobText, resumeId, token) {
   return data;
 }
 
+// Export resume or cover letter as a Word .docx — returns a base64 string
+export async function exportDocx(type, result, token) {
+  const res = await fetch(`${API_URL}/documents/export`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      type,
+      optimized_resume: result.optimized_resume,
+      cover_letter: result.cover_letter,
+    }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Export failed.');
+  }
+
+  const blob = await res.blob();
+  return blob;
+}
+
 // Fetch the user's document history
 export async function getDocuments(token) {
   const res = await fetch(`${API_URL}/documents`, {
