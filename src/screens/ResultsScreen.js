@@ -3,15 +3,23 @@ import { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, font, radius } from '../theme';
 
+// Guard against AI returning the literal string "undefined" or "null" for missing fields
+function sanitize(val) {
+  return (val && val !== 'undefined' && val !== 'null') ? val : '';
+}
+
+// Build a date string from start_date / end_date fields (parser format)
+// or fall back to a combined 'dates' field (older format)
 function formatDates(item) {
-  if (item.dates) return item.dates;
-  const start = item.start_date || '';
-  const end = item.end_date || '';
+  if (sanitize(item.dates)) return item.dates;
+  const start = sanitize(item.start_date);
+  const end = sanitize(item.end_date);
   if (start && end) return `${start} – ${end}`;
   if (start) return start;
   return '';
 }
 
+// Format the structured JSON resume into readable sections
 function formatResume(optimizedResume) {
   if (!optimizedResume) return 'No resume data.';
   if (typeof optimizedResume === 'string') return optimizedResume;
@@ -19,23 +27,32 @@ function formatResume(optimizedResume) {
   const r = optimizedResume;
   const sections = [];
 
+  // Contact info
   if (r.contact) {
-    const contact = [r.contact.name, r.contact.email, r.contact.phone, r.contact.location]
-      .filter(Boolean).join('\n');
+    const contact = [
+      r.contact.name,
+      r.contact.email,
+      r.contact.phone,
+      r.contact.location,
+    ].filter(Boolean).join('\n');
     if (contact) sections.push({ type: 'contact', text: contact });
   }
 
+  // Summary
   if (r.summary) {
     sections.push({ type: 'heading', text: 'SUMMARY' });
     sections.push({ type: 'body', text: r.summary });
   }
 
+  // Experience
   const experience = r.experience || r.work_experience || [];
   if (experience.length) {
     sections.push({ type: 'heading', text: 'EXPERIENCE' });
     experience.forEach(job => {
-      const header = [job.title || job.role, job.company || job.organization].filter(Boolean).join(' — ');
+      const company = job.company || job.organization || '';
+      const title = job.title || job.role || '';
       const dates = formatDates(job);
+      const header = [title, company].filter(Boolean).join(' — ');
       if (header) sections.push({ type: 'jobTitle', text: header });
       if (dates) sections.push({ type: 'dates', text: dates });
       (job.bullets || job.responsibilities || []).forEach(b => {
@@ -44,37 +61,50 @@ function formatResume(optimizedResume) {
     });
   }
 
+  // Skills
   const skills = r.skills;
   if (skills) {
     sections.push({ type: 'heading', text: 'SKILLS' });
     if (Array.isArray(skills)) {
       sections.push({ type: 'body', text: skills.join(' · ') });
     } else if (typeof skills === 'object') {
-      const all = [...(skills.technical || []), ...(skills.languages || []), ...(skills.other || [])];
-      if (all.length) sections.push({ type: 'body', text: all.join(' · ') });
+      const allSkills = [
+        ...(skills.technical || []),
+        ...(skills.languages || []),
+        ...(skills.other || []),
+      ];
+      if (allSkills.length) sections.push({ type: 'body', text: allSkills.join(' · ') });
     }
   }
 
+  // Education
   const education = r.education || [];
   if (education.length) {
     sections.push({ type: 'heading', text: 'EDUCATION' });
     education.forEach(e => {
-      const header = [e.degree || e.field, e.institution || e.school].filter(Boolean).join(' — ');
-      const dates = formatDates(e) || e.graduation_date || '';
+      const institution = e.institution || e.school || '';
+      const degree = e.degree || e.field || '';
+      const dates = formatDates(e) || sanitize(e.graduation_date);
+      const header = [degree, institution].filter(Boolean).join(' — ');
       if (header) sections.push({ type: 'jobTitle', text: header });
       if (dates) sections.push({ type: 'dates', text: dates });
     });
   }
 
+  // Leadership / Activities
   const leadership = r.leadership_activities || r.leadership || [];
   if (leadership.length) {
     sections.push({ type: 'heading', text: 'LEADERSHIP & ACTIVITIES' });
     leadership.forEach(item => {
-      const header = [item.role || item.title, item.organization].filter(Boolean).join(' — ');
+      const org = item.organization || '';
+      const role = item.role || item.title || '';
       const dates = formatDates(item);
+      const header = [role, org].filter(Boolean).join(' — ');
       if (header) sections.push({ type: 'jobTitle', text: header });
       if (dates) sections.push({ type: 'dates', text: dates });
-      (item.bullets || []).forEach(b => sections.push({ type: 'bullet', text: `• ${b}` }));
+      (item.bullets || []).forEach(b => {
+        sections.push({ type: 'bullet', text: `• ${b}` });
+      });
     });
   }
 
@@ -87,6 +117,7 @@ function formatCoverLetter(coverLetter) {
   return coverLetter.body || coverLetter.text || JSON.stringify(coverLetter, null, 2);
 }
 
+// Convert sections array to plain text for clipboard
 function sectionsToPlainText(sections) {
   if (!Array.isArray(sections)) return sections;
   return sections.map(s => s.text).join('\n');
@@ -98,59 +129,29 @@ function scoreColor(score) {
   return colors.error;
 }
 
-function ScoreBadge({ score }) {
-  const color = scoreColor(score);
+function BulletRow({ icon, iconColor, text }) {
   return (
-    <View style={[badge.wrap, { borderColor: color }]}>
-      <View style={[badge.dot, { backgroundColor: color }]} />
-      <Text style={[badge.label, { color }]}>Match Score</Text>
-      <Text style={[badge.score, { color }]}>{score}%</Text>
+    <View style={styles.bulletRow}>
+      <Text style={[styles.bulletIcon, { color: iconColor }]}>{icon}</Text>
+      <Text style={styles.bulletText}>{text}</Text>
     </View>
   );
 }
 
-const badge = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: radius.full,
-    paddingVertical: 4,
-    paddingHorizontal: spacing.md,
-    alignSelf: 'flex-start',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.surface,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  score: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-});
-
-export default function ResultsScreen({ route }) {
+export default function ResultsScreen({ route, navigation }) {
   const { result } = route.params;
-  const [activeTab, setActiveTab] = useState('resume');
+  const [activeTab, setActiveTab] = useState('score');
   const [copied, setCopied] = useState(false);
 
   const resumeSections = formatResume(result.optimized_resume);
   const coverLetterText = formatCoverLetter(result.cover_letter);
-  const matchScore = result.match_score?.score ?? result.match_score?.overall ?? null;
+  const scoreData = result.match_score ?? null;
+  const matchScore = scoreData?.overall_score ?? null;
 
   async function handleCopy() {
-    const text = activeTab === 'resume' ? sectionsToPlainText(resumeSections) : coverLetterText;
+    const text = activeTab === 'resume'
+      ? sectionsToPlainText(resumeSections)
+      : coverLetterText;
     await Clipboard.setStringAsync(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -162,49 +163,151 @@ export default function ResultsScreen({ route }) {
     }
     return resumeSections.map((section, i) => {
       switch (section.type) {
-        case 'contact':  return <Text key={i} style={styles.contactText}>{section.text}</Text>;
-        case 'heading':  return <Text key={i} style={styles.sectionHeading}>{section.text}</Text>;
-        case 'jobTitle': return <Text key={i} style={styles.jobTitle}>{section.text}</Text>;
-        case 'dates':    return <Text key={i} style={styles.datesText}>{section.text}</Text>;
-        case 'bullet':   return <Text key={i} style={styles.bulletText}>{section.text}</Text>;
-        default:         return <Text key={i} style={styles.bodyText}>{section.text}</Text>;
+        case 'contact':
+          return <Text key={i} style={styles.contactText}>{section.text}</Text>;
+        case 'heading':
+          return <Text key={i} style={styles.sectionHeading}>{section.text}</Text>;
+        case 'jobTitle':
+          return <Text key={i} style={styles.jobTitle}>{section.text}</Text>;
+        case 'dates':
+          return <Text key={i} style={styles.datesText}>{section.text}</Text>;
+        case 'bullet':
+          return <Text key={i} style={styles.bulletText}>{section.text}</Text>;
+        default:
+          return <Text key={i} style={styles.bodyText}>{section.text}</Text>;
       }
     });
   };
 
+  const renderScore = () => {
+    if (!scoreData) return <Text style={styles.bodyText}>No score data available.</Text>;
+    const breakdown = scoreData.breakdown ?? {};
+    const breakdownLabels = { skills_match: 'Skills', experience_match: 'Experience', education_match: 'Education' };
+    return (
+      <>
+        {/* Score hero */}
+        <View style={styles.scoreHero}>
+          <Text style={styles.scoreSuperLabel}>YOUR MATCH SCORE</Text>
+          <View style={styles.scoreRow}>
+            <Text style={styles.scoreNumber}>{matchScore}</Text>
+            <Text style={styles.scorePercent}>%</Text>
+          </View>
+        </View>
+
+        {/* Breakdown */}
+        {Object.keys(breakdown).length > 0 && (
+          <View style={styles.scoreCard}>
+            <Text style={styles.scoreCardTitle}>Score Breakdown</Text>
+            {Object.entries(breakdown).map(([key, value]) => (
+              <View key={key} style={styles.categoryRow}>
+                <Text style={styles.categoryLabel}>{breakdownLabels[key] ?? key}</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${value}%`, backgroundColor: scoreColor(value) }]} />
+                </View>
+                <Text style={styles.categoryValue}>{value}%</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Strengths */}
+        {scoreData.strengths?.length > 0 && (
+          <View style={styles.scoreCard}>
+            <Text style={styles.scoreCardTitle}>Strengths</Text>
+            {scoreData.strengths.map((item, i) => (
+              <BulletRow key={i} icon="✓" iconColor={colors.success} text={item} />
+            ))}
+          </View>
+        )}
+
+        {/* Weaknesses */}
+        {scoreData.weaknesses?.length > 0 && (
+          <View style={styles.scoreCard}>
+            <Text style={styles.scoreCardTitle}>Gaps</Text>
+            {scoreData.weaknesses.map((item, i) => (
+              <BulletRow key={i} icon="✕" iconColor={colors.error} text={item} />
+            ))}
+          </View>
+        )}
+
+        {/* ATS Issues */}
+        {scoreData.ats_issues?.length > 0 && (
+          <View style={[styles.scoreCard, styles.suggestionsCard]}>
+            <Text style={styles.scoreCardTitle}>ATS Suggestions</Text>
+            {scoreData.ats_issues.map((item, i) => (
+              <BulletRow key={i} icon="→" iconColor={colors.primary} text={item} />
+            ))}
+          </View>
+        )}
+
+        {/* Recommendation */}
+        {!!scoreData.recommendation && (
+          <View style={styles.scoreCard}>
+            <Text style={styles.scoreCardTitle}>Recommendation</Text>
+            <Text style={styles.bodyText}>{scoreData.recommendation}</Text>
+          </View>
+        )}
+      </>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {matchScore !== null && <ScoreBadge score={matchScore} />}
-
       {/* Tabs */}
       <View style={styles.tabs}>
-        {['resume', 'cover'].map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'resume' ? 'Resume' : 'Cover Letter'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'score' && styles.tabActive]}
+          onPress={() => setActiveTab('score')}
+        >
+          <Text style={[styles.tabText, activeTab === 'score' && styles.tabTextActive]}>
+            Score
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'resume' && styles.tabActive]}
+          onPress={() => setActiveTab('resume')}
+        >
+          <Text style={[styles.tabText, activeTab === 'resume' && styles.tabTextActive]}>
+            Resume
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'cover' && styles.tabActive]}
+          onPress={() => setActiveTab('cover')}
+        >
+          <Text style={[styles.tabText, activeTab === 'cover' && styles.tabTextActive]}>
+            Cover Letter
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
-        {activeTab === 'resume'
-          ? renderResume()
-          : <Text style={styles.bodyText}>{coverLetterText}</Text>
+      <ScrollView style={activeTab === 'score' ? styles.scoreContent : styles.content}
+        contentContainerStyle={activeTab === 'score' ? styles.scoreContentInner : styles.contentInner}>
+        {activeTab === 'score'
+          ? renderScore()
+          : activeTab === 'resume'
+            ? renderResume()
+            : <Text style={styles.bodyText}>{coverLetterText}</Text>
         }
       </ScrollView>
 
-      {/* Copy button */}
-      <TouchableOpacity style={[styles.copyButton, copied && styles.copyButtonDone]} onPress={handleCopy}>
-        <Text style={[styles.copyButtonText, copied && styles.copyButtonTextDone]}>
-          {copied ? '✓ Copied to clipboard' : 'Copy to Clipboard'}
-        </Text>
-      </TouchableOpacity>
+      {/* Bottom actions */}
+      <View style={styles.bottomRow}>
+        {activeTab !== 'score' && (
+          <TouchableOpacity style={styles.copyButton} onPress={handleCopy}>
+            <Text style={styles.copyButtonText}>
+              {copied ? '✓ Copied!' : '📋 Copy'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.finishButton, activeTab === 'score' && styles.finishButtonFull]}
+          onPress={() => navigation.navigate('Done', { result })}
+        >
+          <Text style={styles.finishButtonText}>Finish & Export</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -214,11 +317,105 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // Score tab styles
+  scoreContent: {
+    flex: 1,
+  },
+  scoreContentInner: {
+    padding: spacing.lg,
+    paddingBottom: 40,
+    gap: 14,
+  },
+  scoreHero: {
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+  },
+  scoreSuperLabel: {
+    color: '#c7d2fe',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  scoreNumber: {
+    fontSize: 80,
+    fontWeight: '900',
+    color: '#fff',
+    lineHeight: 80,
+  },
+  scorePercent: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#c7d2fe',
+    marginBottom: 8,
+  },
+  scoreCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  scoreCardTitle: {
+    fontSize: font.md,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  categoryLabel: {
+    width: 80,
+    fontSize: font.sm,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  barTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    marginHorizontal: 10,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  categoryValue: {
+    width: 36,
+    fontSize: font.sm,
+    color: colors.textSecondary,
+    textAlign: 'right',
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  bulletIcon: {
+    fontSize: 14,
+    fontWeight: '700',
+    width: 22,
+    marginTop: 2,
+  },
+  suggestionsCard: {
+    borderColor: '#e0e7ff',
+    backgroundColor: '#fafafe',
+  },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    marginTop: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -231,7 +428,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.primary,
   },
   tabText: {
     fontSize: font.md,
@@ -239,11 +436,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   tabTextActive: {
-    color: '#F8FAFF',
+    color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    marginHorizontal: spacing.lg,
+    margin: spacing.lg,
     marginBottom: spacing.sm,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -254,23 +451,23 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: 4,
   },
+  // Resume section styles
   contactText: {
     fontSize: font.md,
     color: colors.textPrimary,
     lineHeight: 22,
     marginBottom: spacing.sm,
-    fontWeight: '600',
   },
   sectionHeading: {
-    fontSize: 11,
+    fontSize: font.sm,
     fontWeight: '700',
-    color: colors.accent,
-    letterSpacing: 1.2,
+    color: colors.primary,
+    letterSpacing: 1,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: colors.accentLight,
-    paddingBottom: 3,
+    borderBottomColor: colors.border,
+    paddingBottom: 2,
   },
   jobTitle: {
     fontSize: font.md,
@@ -284,34 +481,49 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   bulletText: {
+    flex: 1,
     fontSize: font.sm,
     color: colors.textPrimary,
     lineHeight: 20,
-    paddingLeft: spacing.sm,
   },
   bodyText: {
     fontSize: font.sm,
     color: colors.textPrimary,
     lineHeight: 22,
   },
-  copyButton: {
+  bottomRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
     margin: spacing.lg,
     marginTop: spacing.sm,
-    backgroundColor: colors.ember,
+  },
+  copyButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     alignItems: 'center',
   },
-  copyButtonDone: {
-    backgroundColor: colors.primary,
-  },
   copyButtonText: {
     fontSize: font.md,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
+    fontWeight: '600',
+    color: colors.primary,
   },
-  copyButtonTextDone: {
+  finishButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  finishButtonFull: {
+    flex: 1,
+  },
+  finishButtonText: {
+    fontSize: font.md,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
 });

@@ -13,6 +13,7 @@ import ProcessingScreen from '../screens/ProcessingScreen';
 import ResultsScreen from '../screens/ResultsScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import PaywallScreen from '../screens/PaywallScreen';
+import DoneScreen from '../screens/DoneScreen';
 
 import { colors, font, spacing } from '../theme';
 
@@ -86,9 +87,10 @@ export default function AppNavigator() {
             <Stack.Screen
               name="Processing"
               component={ProcessingScreen}
-              options={{ title: 'Generating...', headerBackVisible: false }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen name="Results" component={ResultsScreen} options={{ title: 'Your Results' }} />
+            <Stack.Screen name="Done" component={DoneScreen} options={{ title: 'Export Documents' }} />
             <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'My Documents' }} />
             <Stack.Screen
               name="Paywall"
