@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.mitchellstrategicsolutions.resumeforgeai",
-      "versionCode": 6,
+      "versionCode": 9,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       }
